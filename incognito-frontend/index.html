@@ -2,14 +2,75 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/src/assets/incognitoLogo.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Receive anonymous messages safely and securely with Incognito" />
+    <link rel="apple-touch-icon" href="/src/assets/incognitoLogo(White).webp" />
+    
+    <!-- Viewport & Mobile Optimization -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Incognito" />
+    
+    <!-- SEO & Meta -->
+    <meta name="description" content="Receive anonymous messages safely and securely with Incognito. Create your private inbox and get honest feedback." />
+    <meta name="keywords" content="anonymous messages, secret messages, confession box, feedback, private inbox" />
+    <meta name="author" content="Incognito" />
     <meta name="theme-color" content="#131313" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://incognito-app.vercel.app/" />
+    <meta property="og:title" content="Incognito - Anonymous Messaging Platform" />
+    <meta property="og:description" content="Receive anonymous messages safely and securely. Create your private inbox today." />
+    <meta property="og:image" content="/src/assets/incognitoLogo(White).webp" />
+    <meta property="og:site_name" content="Incognito" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://incognito-app.vercel.app/" />
+    <meta property="twitter:title" content="Incognito - Anonymous Messaging Platform" />
+    <meta property="twitter:description" content="Receive anonymous messages safely and securely. Create your private inbox today." />
+    <meta property="twitter:image" content="/src/assets/incognitoLogo(White).webp" />
+    
+    <!-- Instagram & Messenger In-App Browser Support -->
+    <meta name="format-detection" content="telephone=no" />
+    <meta http-equiv="x-ua-compatible" content="IE=edge" />
+    
+    <!-- PWA Support -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Preconnect to Firebase -->
+    <link rel="preconnect" href="https://firebaseapp.com" />
+    <link rel="preconnect" href="https://googleapis.com" />
+    <link rel="dns-prefetch" href="https://firebaseapp.com" />
+    <link rel="dns-prefetch" href="https://googleapis.com" />
+    
     <title>Incognito - Anonymous Messaging Platform</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- In-App Browser Detection -->
+    <script>
+      // Detect in-app browsers
+      (function() {
+        const ua = navigator.userAgent || navigator.vendor || window.opera;
+        const isInstagram = /Instagram/i.test(ua);
+        const isFacebook = /FBAN|FBAV/i.test(ua);
+        const isMessenger = /FB_IAB|MESSENGER/i.test(ua);
+        const isInAppBrowser = isInstagram || isFacebook || isMessenger;
+        
+        if (isInAppBrowser) {
+          document.documentElement.classList.add('in-app-browser');
+          if (isInstagram) document.documentElement.classList.add('instagram-browser');
+          if (isFacebook) document.documentElement.classList.add('facebook-browser');
+          if (isMessenger) document.documentElement.classList.add('messenger-browser');
+        }
+      })();
+    </script>
   </body>
 </html>

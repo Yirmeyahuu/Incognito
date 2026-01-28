@@ -6,9 +6,10 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-
   ],
   server: {
+    port: 3000,
+    strictPort: true,
     headers: {
       'X-Frame-Options': 'DENY',
       'X-Content-Type-Options': 'nosniff',
@@ -17,6 +18,15 @@ export default defineConfig({
     },
   },
   build: {
+    outDir: 'dist',
+    sourcemap: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks: {
@@ -25,5 +35,13 @@ export default defineConfig({
         },
       },
     },
+    chunkSizeWarningLimit: 1000,
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom'],
+  },
+  preview: {
+    port: 3000,
+    strictPort: true,
   },
 });
