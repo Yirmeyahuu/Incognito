@@ -16,28 +16,40 @@
     
     <!-- SEO & Meta -->
     <meta name="description" content="Receive anonymous messages safely and securely with Incognito. Create your private inbox and get honest feedback." />
-    <meta name="keywords" content="anonymous messages, secret messages, confession box, feedback, private inbox" />
+    <meta name="keywords" content="anonymous messages, secret messages, confession box, feedback, private inbox, anonymous feedback" />
     <meta name="author" content="Incognito" />
     <meta name="theme-color" content="#131313" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://incognito-app.vercel.app/" />
+    <meta property="og:url" content="https://incognito.cosedevs.com/" />
     <meta property="og:title" content="Incognito - Anonymous Messaging Platform" />
     <meta property="og:description" content="Receive anonymous messages safely and securely. Create your private inbox today." />
-    <meta property="og:image" content="/src/assets/incognitoLogo(White).webp" />
+    <meta property="og:image" content="https://incognito.cosedevs.com/src/assets/incognito-thumbnail.png" />
+    <meta property="og:image:alt" content="Incognito - Anonymous Messaging Platform" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:site_name" content="Incognito" />
+    <meta property="og:locale" content="en_US" />
     
     <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://incognito-app.vercel.app/" />
-    <meta property="twitter:title" content="Incognito - Anonymous Messaging Platform" />
-    <meta property="twitter:description" content="Receive anonymous messages safely and securely. Create your private inbox today." />
-    <meta property="twitter:image" content="/src/assets/incognitoLogo(White).webp" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://incognito.cosedevs.com/" />
+    <meta name="twitter:title" content="Incognito - Anonymous Messaging Platform" />
+    <meta name="twitter:description" content="Receive anonymous messages safely and securely. Create your private inbox today." />
+    <meta name="twitter:image" content="https://incognito.cosedevs.com/src/assets/incognito-thumbnail.png" />
+    <meta name="twitter:image:alt" content="Incognito - Anonymous Messaging Platform" />
+    <meta name="twitter:creator" content="@Incognito" />
     
     <!-- Instagram & Messenger In-App Browser Support -->
     <meta name="format-detection" content="telephone=no" />
     <meta http-equiv="x-ua-compatible" content="IE=edge" />
+    
+    <!-- Additional Social Media Meta Tags -->
+    <meta property="fb:app_id" content="YOUR_FB_APP_ID" />
+    <meta name="application-name" content="Incognito" />
+    <meta name="msapplication-TileColor" content="#131313" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
     
     <!-- PWA Support -->
     <link rel="manifest" href="/manifest.json" />
@@ -47,6 +59,9 @@
     <link rel="preconnect" href="https://googleapis.com" />
     <link rel="dns-prefetch" href="https://firebaseapp.com" />
     <link rel="dns-prefetch" href="https://googleapis.com" />
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://incognito.cosedevs.com/" />
     
     <title>Incognito - Anonymous Messaging Platform</title>
   </head>
@@ -62,13 +77,17 @@
         const isInstagram = /Instagram/i.test(ua);
         const isFacebook = /FBAN|FBAV/i.test(ua);
         const isMessenger = /FB_IAB|MESSENGER/i.test(ua);
-        const isInAppBrowser = isInstagram || isFacebook || isMessenger;
+        const isTikTok = /TikTok/i.test(ua);
+        const isTwitter = /Twitter/i.test(ua);
+        const isInAppBrowser = isInstagram || isFacebook || isMessenger || isTikTok || isTwitter;
         
         if (isInAppBrowser) {
           document.documentElement.classList.add('in-app-browser');
           if (isInstagram) document.documentElement.classList.add('instagram-browser');
           if (isFacebook) document.documentElement.classList.add('facebook-browser');
           if (isMessenger) document.documentElement.classList.add('messenger-browser');
+          if (isTikTok) document.documentElement.classList.add('tiktok-browser');
+          if (isTwitter) document.documentElement.classList.add('twitter-browser');
         }
       })();
     </script>
