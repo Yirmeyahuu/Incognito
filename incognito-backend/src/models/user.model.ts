@@ -6,11 +6,13 @@ import { User } from '../types';
  */
 export class UserModel implements User {
   uid: string;
-  publicId: string;
+  email?: string;
+  publicId?: string;
   createdAt: Date;
 
   constructor(data: User) {
     this.uid = data.uid;
+    this.email = data.email;
     this.publicId = data.publicId;
     this.createdAt = data.createdAt;
   }

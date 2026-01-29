@@ -9,18 +9,19 @@ export class UserService {
   /**
    * Get or create user with public link
    */
-  static async getOrCreateUser(uid: string): Promise<User> {
+  static async getOrCreateUser(uid: string, email?: string): Promise<User> {
     const userRef = db.collection(USERS_COLLECTION).doc(uid);
     const userDoc = await userRef.get();
 
     if (userDoc.exists) {
-      return { uid, ...userDoc.data() } as User; // ADD uid explicitly
+      return { uid, ...userDoc.data() } as User;
     }
 
     // Create new user with unique public ID
     const publicId = generatePublicId();
     const newUser: User = {
       uid,
+      email,
       publicId,
       createdAt: new Date(),
     };
@@ -49,7 +50,6 @@ export class UserService {
       return null;
     }
     
-    // Make sure to include the uid from the document ID
     return { 
       uid: userDoc.id, 
       ...userDoc.data() 
@@ -61,32 +61,30 @@ export class UserService {
    */
   static async getUserByPublicId(publicId: string): Promise<User | null> {
     try {
-      console.log('Looking up public ID:', publicId); // DEBUG
+      console.log('Looking up public ID:', publicId);
       
-      // Get the public link document
       const linkDoc = await db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId).get();
       
       if (!linkDoc.exists) {
-        console.log('Public link not found:', publicId); // DEBUG
+        console.log('Public link not found:', publicId);
         return null;
       }
 
       const linkData = linkDoc.data();
-      console.log('Link data:', linkData); // DEBUG
+      console.log('Link data:', linkData);
       
       if (!linkData?.isActive) {
-        console.log('Link is not active'); // DEBUG
+        console.log('Link is not active');
         return null;
       }
 
       if (!linkData.ownerUid) {
-        console.error('Link data missing ownerUid:', linkData); // DEBUG
+        console.error('Link data missing ownerUid:', linkData);
         return null;
       }
 
-      // Get the user by UID
       const user = await this.getUserByUid(linkData.ownerUid);
-      console.log('Found user:', user); // DEBUG
+      console.log('Found user:', user);
       
       return user;
     } catch (error) {

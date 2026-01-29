@@ -1,9 +1,10 @@
 import { Request } from 'express';
 
-export interface User {
-  uid: string;
-  publicId: string;
-  createdAt: Date;
+export interface AuthRequest extends Request {
+  user?: {
+    uid: string;
+    email?: string;
+  };
 }
 
 export interface PublicLink {
@@ -17,14 +18,13 @@ export interface Message {
   id: string;
   receiverUid: string;
   content: string;
-  createdAt: Date;
   isRead: boolean;
+  createdAt: Date;
 }
 
-// Request types for Express
-export interface AuthRequest extends Request {
-  user?: {
-    uid: string;
-    email?: string;
-  };
+export interface User {
+  uid: string;
+  email?: string;
+  publicId?: string;
+  createdAt: Date;
 }

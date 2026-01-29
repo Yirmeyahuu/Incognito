@@ -1,66 +1,45 @@
-import express, { Application, Request, Response } from 'express';
-import cors from 'cors';
+import express, { Application } from 'express';
+import cors, { CorsOptionsDelegate } from 'cors';
 import helmet from 'helmet';
-import { env } from './config/env';
-import { apiLimiter } from './middleware/rateLimiter.middleware';
-import routes from './routes';
+import rateLimit from 'express-rate-limit';
+import router from './routes';
 
 const app: Application = express();
 
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
+// CORS configuration with proper typing
+const corsOptions: CorsOptionsDelegate = (req, callback) => {
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
+  const origin = req.headers.origin;
+  
+  if (!origin || allowedOrigins.includes(origin)) {
+    callback(null, { origin: true });
+  } else {
+    callback(new Error('Not allowed by CORS'));
+  }
+};
 
-      if (env.allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
 
-// Body parsing middleware
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+});
+app.use(limiter);
+
+// Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
-app.use('/api', apiLimiter);
+// Routes
+app.use('/api', router);
 
-// Health check endpoint
-app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: env.nodeEnv,
-  });
-});
-
-// API routes
-app.use('/api', routes);
-
-// 404 handler
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: `Route ${req.method} ${req.path} not found`,
-  });
-});
-
-// Error handling middleware
-app.use((err: Error, _req: Request, res: Response, _next: any) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: env.nodeEnv === 'development' ? err.message : 'Something went wrong',
-  });
+// Health check
+app.get('/health', (_, res) => {
+  res.status(200).json({ status: 'ok' });
 });
 
 export default app;
