@@ -5,6 +5,7 @@ import { Login } from '../pages/Login';
 import { Register } from '../pages/Register';
 import { Dashboard } from '../pages/Dashboard';
 import { Home } from '../pages/Home';
+import { SendMessage } from '../pages/SendMessage'; // ← ADD THIS IMPORT
 
 // Loading Component
 const LoadingScreen = () => (
@@ -75,6 +76,9 @@ export const AppRoutes = () => {
             </PublicRoute>
           }
         />
+
+        {/* Anonymous message sending route - NO AUTH REQUIRED */}
+        <Route path="/u/:publicId" element={<SendMessage />} />
 
         {/* Protected routes - require authentication */}
         <Route

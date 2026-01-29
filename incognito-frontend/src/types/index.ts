@@ -23,3 +23,19 @@ export interface AuthContextType {
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
 }
+
+// Backend API Types
+export interface BackendMessage {
+  id: string;
+  receiverUid: string;
+  content: string;
+  createdAt: string;
+  isRead: boolean;
+}
+
+export interface PublicLink {
+  publicId: string;
+  ownerUid: string;
+  isActive: boolean;
+  createdAt: Date;
+}

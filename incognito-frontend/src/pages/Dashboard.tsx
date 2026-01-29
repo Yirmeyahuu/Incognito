@@ -1,45 +1,113 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 import { Logo } from '../components/common/Logo';
 import { Modal, ConfirmModal } from '../components/common/Modal';
+import { messageApi, linkApi } from '../services/api';
 import type { Message } from '../types';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: 'Hey! Just wanted to say you\'re doing great! Keep it up! 🎉',
-      timestamp: new Date('2026-01-27T10:30:00'),
-      isRead: false,
-      isArchived: false,
-    },
-    {
-      id: '2',
-      content: 'I really appreciate your work on the project. Thank you!',
-      timestamp: new Date('2026-01-26T15:45:00'),
-      isRead: true,
-      isArchived: false,
-    },
-    {
-      id: '3',
-      content: 'Could you share more about your experience with React? I\'d love to learn from you.',
-      timestamp: new Date('2026-01-25T09:20:00'),
-      isRead: true,
-      isArchived: false,
-    },
-  ]);
-
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [publicLink, setPublicLink] = useState('');
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread' | 'archived'>('all');
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const publicLink = user ? `${window.location.origin}/u/${user.publicId}` : '';
+  // Fetch user's public link
+  useEffect(() => {
+    const fetchPublicLink = async () => {
+      if (!user) return;
+
+      try {
+        const response = await linkApi.getMyLink();
+        if (response.success && response.data) {
+          setPublicLink(`${window.location.origin}/u/${response.data.publicId}`);
+        } else {
+          setError('Failed to load your public link');
+        }
+      } catch (err) {
+        console.error('Error fetching public link:', err);
+        setError('Failed to load your public link');
+      }
+    };
+
+    fetchPublicLink();
+  }, [user]);
+
+  // Update the fetchMessages function (lines 47-81):
+  
+  // Fetch inbox messages
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!user) return;
+  
+      setLoading(true);
+      try {
+        const response = await messageApi.getInbox();
+        console.log('API Response:', JSON.stringify(response, null, 2)); // Better logging
+        console.log('response.data type:', typeof response.data);
+        console.log('response.data is array?', Array.isArray(response.data));
+        console.log('response.data keys:', response.data ? Object.keys(response.data) : 'null');
+        
+        if (response.success && response.data) {
+          let messagesData: any[] = [];
+          
+          // Check if data is directly an array
+          if (Array.isArray(response.data)) {
+            messagesData = response.data;
+          } 
+          // Check if data is an object with a messages property
+          else if (typeof response.data === 'object') {
+            // Try common property names
+            if ('messages' in response.data) {
+              messagesData = (response.data as any).messages;
+            } else if ('data' in response.data) {
+              messagesData = (response.data as any).data;
+            } else {
+              // Log the actual structure
+              console.error('Unexpected data structure. Keys:', Object.keys(response.data));
+              console.error('Full data object:', response.data);
+            }
+          }
+          
+          console.log('Final messagesData:', messagesData);
+          
+          // Convert backend messages to frontend format
+          if (Array.isArray(messagesData) && messagesData.length > 0) {
+            const formattedMessages: Message[] = messagesData.map((msg) => ({
+              id: msg.id,
+              content: msg.content,
+              timestamp: new Date(msg.createdAt),
+              isRead: msg.isRead,
+              isArchived: false,
+            }));
+            setMessages(formattedMessages);
+          } else {
+            setMessages([]);
+          }
+          
+          setError(''); // Clear any errors
+        } else {
+          console.error('API Error:', response);
+          setError(response.error || 'Failed to load messages');
+        }
+      } catch (err) {
+        console.error('Error fetching messages:', err);
+        setError('Failed to load messages');
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    fetchMessages();
+  }, [user]);
 
   const filteredMessages = messages.filter((msg) => {
     if (filter === 'unread') return !msg.isRead;
@@ -49,23 +117,41 @@ export const Dashboard: React.FC = () => {
 
   const unreadCount = messages.filter(m => !m.isRead && !m.isArchived).length;
 
-  const handleMarkAsRead = (id: string) => {
-    setMessages(prev =>
-      prev.map(msg => (msg.id === id ? { ...msg, isRead: true } : msg))
-    );
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      const response = await messageApi.markAsRead(id);
+      if (response.success) {
+        setMessages(prev =>
+          prev.map(msg => (msg.id === id ? { ...msg, isRead: true } : msg))
+        );
+      }
+    } catch (err) {
+      console.error('Error marking message as read:', err);
+    }
   };
 
   const handleArchive = (id: string) => {
+    // Archive functionality - local only for now (backend doesn't support it yet)
     setMessages(prev =>
       prev.map(msg => (msg.id === id ? { ...msg, isArchived: !msg.isArchived } : msg))
     );
   };
 
-  const handleDelete = () => {
-    if (selectedMessage) {
-      setMessages(prev => prev.filter(msg => msg.id !== selectedMessage.id));
-      setShowDeleteModal(false);
-      setSelectedMessage(null);
+  const handleDelete = async () => {
+    if (!selectedMessage) return;
+
+    try {
+      const response = await messageApi.deleteMessage(selectedMessage.id);
+      if (response.success) {
+        setMessages(prev => prev.filter(msg => msg.id !== selectedMessage.id));
+        setShowDeleteModal(false);
+        setSelectedMessage(null);
+      } else {
+        setError(response.error || 'Failed to delete message');
+      }
+    } catch (err) {
+      console.error('Error deleting message:', err);
+      setError('Failed to delete message');
     }
   };
 
@@ -76,6 +162,20 @@ export const Dashboard: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleRegenerateLink = async () => {
+    try {
+      const response = await linkApi.regenerateLink();
+      if (response.success && response.data) {
+        setPublicLink(`${window.location.origin}/u/${response.data.publicId}`);
+      } else {
+        setError(response.error || 'Failed to regenerate link');
+      }
+    } catch (err) {
+      console.error('Error regenerating link:', err);
+      setError('Failed to regenerate link');
     }
   };
 
@@ -98,6 +198,17 @@ export const Dashboard: React.FC = () => {
     if (days < 7) return `${days} days ago`;
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#131313] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#131313] text-white">
@@ -123,14 +234,6 @@ export const Dashboard: React.FC = () => {
                 Share Link
               </Button>
               <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => navigate('/settings')}
-                className="hidden sm:flex"
-              >
-                Settings
-              </Button>
-              <Button
                 variant="outline"
                 size="sm"
                 onClick={handleSignOut}
@@ -143,6 +246,13 @@ export const Dashboard: React.FC = () => {
       </header>
 
       <div className="container mx-auto px-4 py-6 sm:py-8 max-w-4xl">
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
         {/* Stats & Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           {/* Public Link Card */}
@@ -150,25 +260,28 @@ export const Dashboard: React.FC = () => {
             <h3 className="text-sm font-medium text-gray-400 mb-2">Your Public Link</h3>
             <div className="flex items-center gap-2 mb-3">
               <code className="flex-1 text-xs sm:text-sm bg-[#131313] px-3 py-2 rounded border border-white/10 truncate">
-                {publicLink}
+                {publicLink || 'Loading...'}
               </code>
             </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleCopyLink}
-              className="w-full sm:hidden"
-            >
-              {copied ? 'Copied!' : 'Copy Link'}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleCopyLink}
-              className="hidden sm:block"
-            >
-              {copied ? '✓ Copied!' : 'Copy Link'}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleCopyLink}
+                className="flex-1"
+                disabled={!publicLink}
+              >
+                {copied ? '✓ Copied!' : 'Copy Link'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRegenerateLink}
+                disabled={!publicLink}
+              >
+                Regenerate
+              </Button>
+            </div>
           </div>
 
           {/* Stats Card */}
