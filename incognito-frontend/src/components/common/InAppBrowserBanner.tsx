@@ -12,16 +12,60 @@ export const InAppBrowserBanner: React.FC = () => {
 
   const handleOpenInBrowser = () => {
     const currentUrl = window.location.href;
-    
-    // Try to open in external browser
-    if (browserInfo.isInstagram || browserInfo.isFacebook || browserInfo.isMessenger) {
-      // For iOS
-      if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        window.location.href = `x-safari-${currentUrl}`;
-      } else {
-        // For Android
-        window.open(currentUrl, '_system');
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // ✅ MOBILE DEVICES: Try Brave → Chrome → Safari (iOS) → Default
+      if (isIOS) {
+        // iOS: Try Safari first, then fallback
+        const safariUrl = `x-safari-${currentUrl}`;
+        const chromeUrl = `googlechrome://${currentUrl.replace(/^https?:\/\//, '')}`;
+        const braveUrl = `brave://${currentUrl.replace(/^https?:\/\//, '')}`;
+
+        // Try Brave first
+        const braveWindow = window.open(braveUrl, '_blank');
+        
+        // If Brave doesn't open, try Chrome
+        setTimeout(() => {
+          if (!braveWindow || braveWindow.closed) {
+            const chromeWindow = window.open(chromeUrl, '_blank');
+            
+            // If Chrome doesn't open, fallback to Safari
+            setTimeout(() => {
+              if (!chromeWindow || chromeWindow.closed) {
+                window.location.href = safariUrl;
+              }
+            }, 500);
+          }
+        }, 500);
+      } else if (isAndroid) {
+        // Android: Try Brave → Chrome → Default browser
+        const intentUrl = `intent://${currentUrl.replace(/^https?:\/\//, '')}#Intent;scheme=https;end`;
+        const braveUrl = `brave://open-url?url=${encodeURIComponent(currentUrl)}`;
+        const chromeUrl = `googlechrome://navigate?url=${encodeURIComponent(currentUrl)}`;
+
+        // Try Brave first
+        const braveWindow = window.open(braveUrl, '_blank');
+        
+        setTimeout(() => {
+          if (!braveWindow || braveWindow.closed) {
+            // Try Chrome
+            const chromeWindow = window.open(chromeUrl, '_blank');
+            
+            setTimeout(() => {
+              if (!chromeWindow || chromeWindow.closed) {
+                // Fallback to Android Intent
+                window.location.href = intentUrl;
+              }
+            }, 500);
+          }
+        }, 500);
       }
+    } else {
+      // ✅ DESKTOP: Open in default browser (new tab)
+      window.open(currentUrl, '_blank');
     }
   };
 
@@ -49,7 +93,7 @@ export const InAppBrowserBanner: React.FC = () => {
               You're viewing this in {browserInfo.browserName}
             </p>
             <p className="text-[10px] sm:text-xs text-yellow-800 mb-2">
-              For the best experience, open this link in your browser (Safari, Chrome, etc.)
+              For the best experience, open this link in your browser (Brave, Chrome, Safari, etc.)
             </p>
             
             <div className="flex flex-wrap gap-2">
