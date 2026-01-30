@@ -33,22 +33,16 @@ export const PublicLink: React.FC<PublicLinkProps> = ({ className = '' }) => {
         if (docSnapshot.exists()) {
           const userData = docSnapshot.data();
           
-          // ✅ FIXED: Use publicLink from Firestore directly
-          // If publicLink doesn't exist, construct from publicId
-          let link = userData.publicLink;
-          
-          if (!link && userData.publicId) {
-            // Fallback: construct link (only if publicLink is missing)
-            link = `${window.location.origin}/u/${userData.publicId}`;
-            console.warn('⚠️ publicLink missing, using fallback:', link);
+          // ✅ ALWAYS construct link from publicId using current domain
+          if (userData.publicId) {
+            const fullLink = `${window.location.origin}/u/${userData.publicId}`;
+            setPublicLink(fullLink);
+            console.log('✅ Real-time update - Link constructed:', fullLink);
+            console.log('   Public ID:', userData.publicId);
+          } else {
+            console.warn('⚠️ No publicId found in user document');
+            setError('No public ID found. Please try regenerating your link.');
           }
-          
-          setPublicLink(link || '');
-          console.log('✅ Real-time update - Link loaded:', link);
-          console.log('   Raw Firestore data:', {
-            publicId: userData.publicId,
-            publicLink: userData.publicLink
-          }); // ✅ DEBUG LOG
         } else {
           console.warn('⚠️ User document does not exist in Firestore');
           setError('User profile not found. Please try signing out and back in.');
@@ -92,9 +86,7 @@ export const PublicLink: React.FC<PublicLinkProps> = ({ className = '' }) => {
       
       if (response.success && response.data) {
         console.log('✅ Link regenerated successfully:', response.data.publicId);
-        console.log('   New publicLink from API:', response.data.publicLink); // ✅ DEBUG LOG
-        // ✅ NO NEED TO UPDATE STATE - Firestore listener will handle it automatically!
-        // The onSnapshot listener above will receive the update and display the new link
+        // ✅ Firestore listener will automatically update the link
       } else {
         setError(response.error || 'Failed to regenerate link');
       }

@@ -1,7 +1,6 @@
 import { db } from '../config/firebase';
 import { User } from '../types';
 import { generatePublicId } from '../utils/generatePublicId';
-import { env } from '../config/env';
 
 const USERS_COLLECTION = 'users';
 const PUBLIC_LINKS_COLLECTION = 'publicLinks';
@@ -32,48 +31,37 @@ export class UserService {
         // ✅ Update user doc if publicId doesn't match
         if (userData.publicId !== activePublicId) {
           console.warn(`⚠️ User ${uid} has mismatched publicId, syncing...`);
-          const fullLink = `${env.frontendUrl}/u/${activePublicId}`; // ✅ Fixed
           
           await userRef.update({ 
             publicId: activePublicId,
-            publicLink: fullLink,
-            linkUpdatedAt: new Date(),
             updatedAt: new Date()
           });
           
           userData.publicId = activePublicId;
-          userData.publicLink = fullLink;
         }
       } else {
         // Create new link if none exists
         console.warn(`⚠️ No active link found for user ${uid}, creating new one...`);
         const newPublicId = await this.createPublicLinkForUser(uid);
-        const fullLink = `${env.frontendUrl}/u/${newPublicId}`; // ✅ Fixed
         
         await userRef.update({ 
           publicId: newPublicId,
-          publicLink: fullLink,
-          linkUpdatedAt: new Date(),
           updatedAt: new Date()
         });
         
         userData.publicId = newPublicId;
-        userData.publicLink = fullLink;
       }
       
       return { ...userData, uid } as User;
     }
 
-    // ✅ Create new user with link
+    // ✅ Create new user with publicId only
     const publicId = generatePublicId();
-    const publicLink = `${env.frontendUrl}/u/${publicId}`; // ✅ Fixed
     
     const newUser: User = {
       uid,
       email,
       publicId,
-      publicLink,
-      linkUpdatedAt: new Date(),
       createdAt: new Date(),
     };
 
@@ -125,9 +113,7 @@ export class UserService {
         uid: userDoc.id
       } as User;
     } catch (error) {
-      if (env.nodeEnv === 'development') {
-        console.error('Error fetching user by UID:', error);
-      }
+      console.error('Error fetching user by UID:', error);
       return null;
     }
   }
@@ -150,18 +136,14 @@ export class UserService {
       }
 
       if (!linkData.ownerUid) {
-        if (env.nodeEnv === 'development') {
-          console.error('Invalid link data: missing ownerUid');
-        }
+        console.error('Invalid link data: missing ownerUid');
         return null;
       }
 
       const user = await this.getUserByUid(linkData.ownerUid);
       return user;
     } catch (error) {
-      if (env.nodeEnv === 'development') {
-        console.error('Error fetching user by public ID:', error);
-      }
+      console.error('Error fetching user by public ID:', error);
       return null;
     }
   }
