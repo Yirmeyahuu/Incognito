@@ -5,6 +5,7 @@ import { Button } from '../components/common/Button';
 import { Logo } from '../components/common/Logo';
 import { Modal } from '../components/common/Modal';
 import { LogoutConfirmModal } from '../components/common/LogoutConfirmModal';
+import { ViewMessageModal } from '../components/common/ViewMessageModal';
 import { messageApi, linkApi } from '../services/api';
 import type { Message } from '../types';
 import type { BackendMessage } from '../services/api';
@@ -16,10 +17,15 @@ export const Dashboard: React.FC = () => {
   const [publicLink, setPublicLink] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showViewMessageModal, setShowViewMessageModal] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Character limit for message preview
+  const MESSAGE_PREVIEW_LIMIT = 150;
 
   // Fetch user's public link
   useEffect(() => {
@@ -164,6 +170,29 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const handleMessageClick = (message: Message): void => {
+    setSelectedMessage(message);
+    setShowViewMessageModal(true);
+  };
+
+  const truncateMessage = (content: string, limit: number): { text: string; isTruncated: boolean } => {
+    if (content.length <= limit) {
+      return { text: content, isTruncated: false };
+    }
+    
+    // Find the last space before the limit to avoid cutting words
+    let truncateAt = limit;
+    const lastSpace = content.lastIndexOf(' ', limit);
+    if (lastSpace > limit * 0.8) { // Only use last space if it's not too far back
+      truncateAt = lastSpace;
+    }
+    
+    return {
+      text: content.substring(0, truncateAt).trim(),
+      isTruncated: true
+    };
+  };
+
   const formatDate = (date: Date): string => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -282,7 +311,7 @@ export const Dashboard: React.FC = () => {
           </h2>
         </div>
 
-        {/* Messages Grid - 2 columns on desktop, 1 on mobile */}
+        {/* Messages Grid */}
         {messages.length === 0 ? (
           <div className="bg-[#111111] border border-white/5 rounded-2xl p-16 text-center">
             <div className="w-20 h-20 bg-[#1a1a1a] rounded-full flex items-center justify-center mx-auto mb-6">
@@ -295,29 +324,47 @@ export const Dashboard: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 hover:border-purple-500/20 transition-all group"
-              >
-                {/* Outer Container - Date Label */}
-                <div className="flex items-center gap-2 mb-4">
-                  <svg className="w-4 h-4 text-gray-600 group-hover:text-purple-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Received {formatDate(message.timestamp)}
-                  </span>
+            {messages.map((message) => {
+              const { text: previewText, isTruncated } = truncateMessage(message.content, MESSAGE_PREVIEW_LIMIT);
+              
+              return (
+                <div
+                  key={message.id}
+                  onClick={() => handleMessageClick(message)}
+                  className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 hover:border-purple-500/30 hover:bg-[#111111] transition-all group cursor-pointer"
+                >
+                  {/* Date Label */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <svg className="w-4 h-4 text-gray-600 group-hover:text-purple-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Received {formatDate(message.timestamp)}
+                    </span>
+                  </div>
+                  
+                  {/* Message Content */}
+                  <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-5 group-hover:bg-[#1c1c1c] group-hover:border-purple-500/20 transition-colors">
+                    <p className="text-base text-gray-200 leading-relaxed whitespace-pre-wrap break-words">
+                      {previewText}
+                      {isTruncated && (
+                        <span className="text-purple-400 font-medium ml-1">
+                          ... See more
+                        </span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Click indicator */}
+                  <div className="mt-3 flex items-center justify-end gap-2 text-xs text-gray-600 group-hover:text-purple-400 transition-colors">
+                    <span>Click to view full message</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
                 </div>
-                
-                {/* Inner Container - Message Content */}
-                <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-5 hover:bg-[#1c1c1c] transition-colors">
-                  <p className="text-base text-gray-200 leading-relaxed whitespace-pre-wrap break-words">
-                    {message.content}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -351,6 +398,16 @@ export const Dashboard: React.FC = () => {
           </Button>
         </div>
       </Modal>
+
+      {/* View Message Modal */}
+      <ViewMessageModal
+        isOpen={showViewMessageModal}
+        onClose={() => {
+          setShowViewMessageModal(false);
+          setSelectedMessage(null);
+        }}
+        message={selectedMessage}
+      />
     </div>
   );
 };
