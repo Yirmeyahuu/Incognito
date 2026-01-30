@@ -97,15 +97,15 @@ export const Landing: React.FC = () => {
                 <p className="text-xs sm:text-sm text-gray-400">Get your unique link in seconds. No complex configuration needed.</p>
               </div>
 
-              {/* Feature 3 */}
+              {/* Feature 3 - ✅ UPDATED */}
               <div className="bg-[#111111] border border-white/5 rounded-lg sm:rounded-xl p-4 sm:p-5 hover:border-white/10 transition-all sm:col-span-2 lg:col-span-1">
                 <div className="w-9 h-9 sm:w-11 sm:h-11 bg-pink-500/10 rounded-lg flex items-center justify-center mb-2.5 sm:mb-3">
                   <svg className="w-4 h-4 sm:w-5 sm:h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </div>
                 <h4 className="text-base sm:text-lg font-semibold mb-1.5 sm:mb-2">Full Control</h4>
-                <p className="text-xs sm:text-sm text-gray-400">Enable or disable your inbox anytime. Delete or archive messages.</p>
+                <p className="text-xs sm:text-sm text-gray-400">Regenerate new link anytime to avoid spam and unwanted messages.</p>
               </div>
             </div>
           </div>
