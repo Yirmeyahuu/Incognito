@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { Button } from './Button';
+import { ShareCardGenerator } from './ShareCardGenerator';
 import { linkApi } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../config/firebase';
@@ -16,6 +17,7 @@ export const PublicLink: React.FC<PublicLinkProps> = ({ className = '' }) => {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // ✅ REAL-TIME: Listen to Firestore user document for instant updates
   useEffect(() => {
@@ -99,48 +101,74 @@ export const PublicLink: React.FC<PublicLinkProps> = ({ className = '' }) => {
   };
 
   return (
-    <div className={`bg-[#111111] border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-all ${className}`}>
-      <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">
-        Your Public Link
-      </h3>
+    <>
+      <div className={`bg-[#111111] border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-all ${className}`}>
+        <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">
+          Your Public Link
+        </h3>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-4 text-xs text-red-400">
-          {error}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-4 text-xs text-red-400">
+            {error}
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 mb-4">
+          <code className="flex-1 text-sm bg-[#0a0a0a] px-4 py-3 rounded-xl border border-white/5 truncate font-mono text-purple-400">
+            {isLoading ? 'Loading...' : publicLink || 'No link available'}
+          </code>
         </div>
-      )}
 
-      <div className="flex items-center gap-3 mb-4">
-        <code className="flex-1 text-sm bg-[#0a0a0a] px-4 py-3 rounded-xl border border-white/5 truncate font-mono text-purple-400">
-          {isLoading ? 'Loading...' : publicLink || 'No link available'}
-        </code>
+        <div className="flex flex-col gap-3">
+          {/* Primary Actions Row */}
+          <div className="flex gap-3">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleCopyLink}
+              className="flex-1"
+              disabled={!publicLink || isRegenerating || isLoading}
+            >
+              {copied ? '✓ Copied!' : 'Copy Link'}
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
+              onClick={handleRegenerateLink}
+              disabled={!publicLink || isRegenerating || isLoading}
+            >
+              {isRegenerating ? 'Regenerating...' : 'Regenerate'}
+            </Button>
+          </div>
+
+          {/* ✅ UPDATED: Share to Social Media Button - Smaller size */}
+          <button
+            onClick={() => setShowShareModal(true)}
+            disabled={!publicLink || isRegenerating || isLoading}
+            className="w-full px-3 py-2 text-xs font-medium border border-purple-500/20 hover:border-purple-500/40 hover:bg-purple-500/10 text-purple-400 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            <span>Share to Social Media</span>
+          </button>
+        </div>
+
+        {publicLink && !error && !isLoading && (
+          <p className="text-xs text-gray-600 mt-3 text-center">
+            Share this link to receive anonymous messages
+          </p>
+        )}
       </div>
 
-      <div className="flex gap-3">
-        <Button
-          variant="primary"
-          size="md"
-          onClick={handleCopyLink}
-          className="flex-1"
-          disabled={!publicLink || isRegenerating || isLoading}
-        >
-          {copied ? '✓ Copied!' : 'Copy Link'}
-        </Button>
-        <Button
-          variant="outline"
-          size="md"
-          onClick={handleRegenerateLink}
-          disabled={!publicLink || isRegenerating || isLoading}
-        >
-          {isRegenerating ? 'Regenerating...' : 'Regenerate'}
-        </Button>
-      </div>
-
-      {publicLink && !error && !isLoading && (
-        <p className="text-xs text-gray-600 mt-3 text-center">
-          Share this link to receive anonymous messages
-        </p>
+      {/* ✅ Share Modal */}
+      {showShareModal && (
+        <ShareCardGenerator
+          publicLink={publicLink}
+          username={user?.displayName || user?.email?.split('@')[0] || 'Anonymous'}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
-    </div>
+    </>
   );
 };

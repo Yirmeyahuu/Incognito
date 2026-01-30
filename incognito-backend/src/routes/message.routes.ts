@@ -11,6 +11,7 @@ router.post('/send/:publicId', messageLimiter, MessageController.sendMessage);
 // Protected routes (require authentication)
 router.get('/inbox', authenticateUser, MessageController.getInbox);
 router.patch('/:messageId/read', authenticateUser, MessageController.markAsRead);
+router.patch('/mark-all-read', authenticateUser, MessageController.markAllAsRead); // ✅ NEW
 router.delete('/:messageId', authenticateUser, MessageController.deleteMessage);
 
 export default router;

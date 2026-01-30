@@ -6,7 +6,8 @@ import { Logo } from '../components/common/Logo';
 import { Modal } from '../components/common/Modal';
 import { LogoutConfirmModal } from '../components/common/LogoutConfirmModal';
 import { ViewMessageModal } from '../components/common/ViewMessageModal';
-import { PublicLink } from '../components/common/PublicLink'; // ← NEW IMPORT
+import { PublicLink } from '../components/common/PublicLink';
+import { MessageList } from '../components/common/MessageList';
 import { messageApi } from '../services/api';
 import type { Message } from '../types';
 import type { BackendMessage } from '../services/api';
@@ -23,22 +24,19 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Character limit for message preview
-  const MESSAGE_PREVIEW_LIMIT = 150;
-
   // Fetch inbox messages
   useEffect(() => {
     const fetchMessages = async (): Promise<void> => {
       if (!user) return;
 
       setLoading(true);
-      
+
       try {
         const response = await messageApi.getInbox();
-        
+
         if (response.success && response.data) {
           let messagesData: BackendMessage[] = [];
-          
+
           if (Array.isArray(response.data)) {
             messagesData = response.data as BackendMessage[];
           } else if (typeof response.data === 'object' && response.data !== null) {
@@ -48,16 +46,18 @@ export const Dashboard: React.FC = () => {
               messagesData = response.data.data as BackendMessage[];
             }
           }
-          
+
           if (Array.isArray(messagesData) && messagesData.length > 0) {
             const formattedMessages: Message[] = messagesData
               .filter((msg): msg is BackendMessage => {
-                return typeof msg === 'object' && 
-                       msg !== null &&
-                       typeof msg.id === 'string' && 
-                       typeof msg.content === 'string' &&
-                       (typeof msg.createdAt === 'string' || 
-                        (typeof msg.createdAt === 'object' && msg.createdAt !== null));
+                return (
+                  typeof msg === 'object' &&
+                  msg !== null &&
+                  typeof msg.id === 'string' &&
+                  typeof msg.content === 'string' &&
+                  (typeof msg.createdAt === 'string' ||
+                    (typeof msg.createdAt === 'object' && msg.createdAt !== null))
+                );
               })
               .map((msg) => {
                 let timestamp: Date;
@@ -76,21 +76,21 @@ export const Dashboard: React.FC = () => {
                 } else {
                   timestamp = new Date();
                 }
-                
+
                 return {
                   id: msg.id,
                   content: msg.content,
                   timestamp,
-                  isRead: false,
+                  isRead: msg.isRead || false, // ✅ Use backend value
                   isArchived: false,
                 };
               });
-            
+
             setMessages(formattedMessages);
           } else {
             setMessages([]);
           }
-          
+
           setError('');
         } else {
           setError(response.error || 'Failed to load messages');
@@ -115,12 +115,11 @@ export const Dashboard: React.FC = () => {
     setIsLoggingOut(true);
     try {
       await signOut();
-      
-      // Clear cached link on logout
+
       if (user) {
         localStorage.removeItem(`incognito_public_link_${user.uid}`);
       }
-      
+
       navigate('/');
     } catch (error) {
       setError('Failed to sign out');
@@ -130,37 +129,46 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleMessageClick = (message: Message): void => {
+  // ✅ UPDATED: Mark single message as read (both state + backend)
+  const handleMessageClick = async (message: Message): Promise<void> => {
     setSelectedMessage(message);
     setShowViewMessageModal(true);
+
+    // Mark as read in state immediately for instant UI feedback
+    if (!message.isRead) {
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.id === message.id ? { ...msg, isRead: true } : msg
+        )
+      );
+
+      // ✅ Persist to backend
+      try {
+        await messageApi.markAsRead(message.id);
+      } catch (error) {
+        console.error('Failed to mark message as read:', error);
+        // Optionally revert state if backend call fails
+      }
+    }
   };
 
-  const truncateMessage = (content: string, limit: number): { text: string; isTruncated: boolean } => {
-    if (content.length <= limit) {
-      return { text: content, isTruncated: false };
-    }
-    
-    let truncateAt = limit;
-    const lastSpace = content.lastIndexOf(' ', limit);
-    if (lastSpace > limit * 0.8) {
-      truncateAt = lastSpace;
-    }
-    
-    return {
-      text: content.substring(0, truncateAt).trim(),
-      isTruncated: true
-    };
-  };
+  // ✅ UPDATED: Mark all messages as read (both state + backend)
+  const handleMarkAllAsRead = async (): Promise<void> => {
+    // Update state immediately for instant UI feedback
+    setMessages(prevMessages =>
+      prevMessages.map(msg => ({ ...msg, isRead: true }))
+    );
 
-  const formatDate = (date: Date): string => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Yesterday';
-    if (days < 7) return `${days} days ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    // ✅ Persist to backend
+    try {
+      const response = await messageApi.markAllAsRead();
+      if (!response.success) {
+        setError('Failed to mark all messages as read');
+      }
+    } catch (error) {
+      console.error('Failed to mark all messages as read:', error);
+      setError('Failed to mark all messages as read');
+    }
   };
 
   if (loading) {
@@ -197,11 +205,7 @@ export const Dashboard: React.FC = () => {
               >
                 Share Link
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSignOutClick}
-              >
+              <Button variant="outline" size="sm" onClick={handleSignOutClick}>
                 Sign Out
               </Button>
             </div>
@@ -219,7 +223,6 @@ export const Dashboard: React.FC = () => {
 
         {/* Stats & Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* ✅ NEW: Public Link Component */}
           <PublicLink />
 
           {/* Stats Card */}
@@ -244,62 +247,14 @@ export const Dashboard: React.FC = () => {
           </h2>
         </div>
 
-        {/* Messages Grid */}
-        {messages.length === 0 ? (
-          <div className="bg-[#111111] border border-white/5 rounded-2xl p-16 text-center">
-            <div className="w-20 h-20 bg-[#1a1a1a] rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-10 h-10 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-400 mb-2">No messages yet</h3>
-            <p className="text-gray-600">Share your link to start receiving anonymous messages</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {messages.map((message) => {
-              const { text: previewText, isTruncated } = truncateMessage(message.content, MESSAGE_PREVIEW_LIMIT);
-              
-              return (
-                <div
-                  key={message.id}
-                  onClick={() => handleMessageClick(message)}
-                  className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 hover:border-purple-500/30 hover:bg-[#111111] transition-all group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <svg className="w-4 h-4 text-gray-600 group-hover:text-purple-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Received {formatDate(message.timestamp)}
-                    </span>
-                  </div>
-                  
-                  <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-5 group-hover:bg-[#1c1c1c] group-hover:border-purple-500/20 transition-colors">
-                    <p className="text-base text-gray-200 leading-relaxed whitespace-pre-wrap break-words">
-                      {previewText}
-                      {isTruncated && (
-                        <span className="text-purple-400 font-medium ml-1">
-                          ... See more
-                        </span>
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-end gap-2 text-xs text-gray-600 group-hover:text-purple-400 transition-colors">
-                    <span>Click to view full message</span>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <MessageList
+          messages={messages}
+          onMessageClick={handleMessageClick}
+          onMarkAllAsRead={handleMarkAllAsRead}
+          loading={false}
+        />
       </div>
 
-      {/* Logout Confirmation Modal */}
       <LogoutConfirmModal
         isOpen={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
@@ -307,7 +262,6 @@ export const Dashboard: React.FC = () => {
         isLoading={isLoggingOut}
       />
 
-      {/* Share Link Modal - Now uses PublicLink component */}
       <Modal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
@@ -317,7 +271,6 @@ export const Dashboard: React.FC = () => {
         <PublicLink className="!p-0 !border-0 !bg-transparent" />
       </Modal>
 
-      {/* View Message Modal */}
       <ViewMessageModal
         isOpen={showViewMessageModal}
         onClose={() => {
