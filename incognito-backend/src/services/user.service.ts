@@ -8,6 +8,7 @@ const PUBLIC_LINKS_COLLECTION = 'publicLinks';
 export class UserService {
   /**
    * Get or create user with public link
+   * ✅ OPTIMIZED: Works with deleted old links
    */
   static async getOrCreateUser(uid: string, email?: string): Promise<User> {
     const userRef = db.collection(USERS_COLLECTION).doc(uid);
@@ -16,12 +17,11 @@ export class UserService {
     if (userDoc.exists) {
       const userData = userDoc.data() as User;
       
-      // ✅ Verify active link exists
+      // ✅ Verify active link exists (old links are deleted, not deactivated)
       const activeLinkSnapshot = await db
         .collection(PUBLIC_LINKS_COLLECTION)
         .where('ownerUid', '==', uid)
         .where('isActive', '==', true)
-        .orderBy('createdAt', 'desc')
         .limit(1)
         .get();
       
@@ -40,7 +40,7 @@ export class UserService {
           userData.publicId = activePublicId;
         }
       } else {
-        // Create new link if none exists
+        // Create new link if none exists (old ones were deleted)
         console.warn(`⚠️ No active link found for user ${uid}, creating new one...`);
         const newPublicId = await this.createPublicLinkForUser(uid);
         
@@ -120,17 +120,20 @@ export class UserService {
 
   /**
    * Get user by public ID
+   * ✅ OPTIMIZED: Only checks if link exists (deleted links won't be found)
    */
   static async getUserByPublicId(publicId: string): Promise<User | null> {
     try {
       const linkDoc = await db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId).get();
       
+      // ✅ If link doesn't exist (deleted), return null
       if (!linkDoc.exists) {
         return null;
       }
 
       const linkData = linkDoc.data();
       
+      // ✅ Still check isActive for safety
       if (!linkData?.isActive) {
         return null;
       }

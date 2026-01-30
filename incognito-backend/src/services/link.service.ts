@@ -39,23 +39,24 @@ export class LinkService {
 
   /**
    * Regenerate user's public link
+   * ✅ OPTIMIZED: Deletes old links instead of deactivating
    */
   static async regenerateLink(uid: string): Promise<PublicLink> {
     console.log(`\n🔄 Starting regenerateLink for uid: ${uid}`);
     
     const batch = db.batch();
     
-    // Deactivate ALL old links
+    // ✅ DELETE ALL old links instead of deactivating
     const oldLinkSnapshot = await db
       .collection(PUBLIC_LINKS_COLLECTION)
       .where('ownerUid', '==', uid)
       .get();
 
-    console.log(`📋 Found ${oldLinkSnapshot.size} existing link(s) to deactivate`);
+    console.log(`�️ Found ${oldLinkSnapshot.size} existing link(s) to DELETE`);
     
     oldLinkSnapshot.docs.forEach(doc => {
-      console.log(`   - Deactivating: ${doc.id}`);
-      batch.update(doc.ref, { isActive: false });
+      console.log(`   - Deleting: ${doc.id}`);
+      batch.delete(doc.ref);
     });
 
     // Create new link
