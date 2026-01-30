@@ -1,25 +1,45 @@
 import { Response } from 'express';
 import { AuthRequest } from '../types';
-import { UserService } from '../services/user.service';
 import { LinkService } from '../services/link.service';
+import { db } from '../config/firebase';
 
 export class LinkController {
   /**
-   * GET /api/links/my-link
-   * Get authenticated user's public link
+   * ✅ GET /api/links/my-link - Read from user document
    */
   static async getMyLink(req: AuthRequest, res: Response): Promise<void> {
+    console.log('🎯 getMyLink endpoint called');
     try {
       const uid = req.user!.uid;
+      console.log(`   User UID: ${uid}`);
 
-      // Get or create user (creates link automatically)
-      const user = await UserService.getOrCreateUser(uid);
+      // ✅ Read directly from user document (fastest)
+      const userDoc = await db.collection('users').doc(uid).get();
+      
+      if (!userDoc.exists) {
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: 'User document not found. Please try regenerating your link.',
+        });
+        return;
+      }
+
+      const userData = userDoc.data();
+      
+      // ✅ Add null check
+      if (!userData || !userData.publicId) {
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: 'Failed to retrieve link. Please try regenerating your link.',
+        });
+        return;
+      }
 
       res.status(200).json({
         success: true,
         data: {
-          publicId: user.publicId,
-          link: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/send/${user.publicId}`,
+          publicId: userData.publicId,
+          publicLink: userData.publicLink, // ✅ Return full link
         },
       });
     } catch (error) {
@@ -32,20 +52,40 @@ export class LinkController {
   }
 
   /**
-   * POST /api/links/regenerate
-   * Regenerate user's public link
+   * ✅ POST /api/links/regenerate - Returns new link immediately
    */
   static async regenerateLink(req: AuthRequest, res: Response): Promise<void> {
+    console.log('🎯 regenerateLink endpoint called');
     try {
       const uid = req.user!.uid;
+      console.log(`   User UID: ${uid}`);
 
       const newLink = await LinkService.regenerateLink(uid);
+      
+      // ✅ Read fresh user document to get full link
+      const userDoc = await db.collection('users').doc(uid).get();
+      const userData = userDoc.data();
+
+      // ✅ Add null check
+      if (!userData || !userData.publicLink) {
+        // Fallback: construct link from publicId
+        const fullLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/u/${newLink.publicId}`;
+        res.status(200).json({
+          success: true,
+          data: {
+            publicId: newLink.publicId,
+            publicLink: fullLink,
+          },
+          message: 'Link regenerated successfully',
+        });
+        return;
+      }
 
       res.status(200).json({
         success: true,
         data: {
           publicId: newLink.publicId,
-          link: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/send/${newLink.publicId}`,
+          publicLink: userData.publicLink, // ✅ Return full link
         },
         message: 'Link regenerated successfully',
       });
@@ -60,19 +100,15 @@ export class LinkController {
 
   /**
    * GET /api/links/validate/:publicId
-   * Validate if a public link is valid (no auth required)
    */
   static async validateLink(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { publicId } = req.params;
-
       const isValid = await LinkService.validateLink(publicId);
 
       res.status(200).json({
         success: true,
-        data: {
-          isValid,
-        },
+        data: { isValid },
       });
     } catch (error) {
       console.error('Validate link error:', error);

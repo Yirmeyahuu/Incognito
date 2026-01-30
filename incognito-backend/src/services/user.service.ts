@@ -15,19 +15,68 @@ export class UserService {
     const userDoc = await userRef.get();
 
     if (userDoc.exists) {
-      return { uid, ...userDoc.data() } as User;
+      const userData = userDoc.data() as User;
+      
+      // ✅ Verify active link exists
+      const activeLinkSnapshot = await db
+        .collection(PUBLIC_LINKS_COLLECTION)
+        .where('ownerUid', '==', uid)
+        .where('isActive', '==', true)
+        .orderBy('createdAt', 'desc')
+        .limit(1)
+        .get();
+      
+      if (!activeLinkSnapshot.empty) {
+        const activePublicId = activeLinkSnapshot.docs[0].data().publicId;
+        
+        // ✅ Update user doc if publicId doesn't match
+        if (userData.publicId !== activePublicId) {
+          console.warn(`⚠️ User ${uid} has mismatched publicId, syncing...`);
+          const fullLink = `${env.frontendUrl}/u/${activePublicId}`; // ✅ Fixed
+          
+          await userRef.update({ 
+            publicId: activePublicId,
+            publicLink: fullLink,
+            linkUpdatedAt: new Date(),
+            updatedAt: new Date()
+          });
+          
+          userData.publicId = activePublicId;
+          userData.publicLink = fullLink;
+        }
+      } else {
+        // Create new link if none exists
+        console.warn(`⚠️ No active link found for user ${uid}, creating new one...`);
+        const newPublicId = await this.createPublicLinkForUser(uid);
+        const fullLink = `${env.frontendUrl}/u/${newPublicId}`; // ✅ Fixed
+        
+        await userRef.update({ 
+          publicId: newPublicId,
+          publicLink: fullLink,
+          linkUpdatedAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        userData.publicId = newPublicId;
+        userData.publicLink = fullLink;
+      }
+      
+      return { ...userData, uid } as User;
     }
 
-    // Create new user with unique public ID
+    // ✅ Create new user with link
     const publicId = generatePublicId();
+    const publicLink = `${env.frontendUrl}/u/${publicId}`; // ✅ Fixed
+    
     const newUser: User = {
       uid,
       email,
       publicId,
+      publicLink,
+      linkUpdatedAt: new Date(),
       createdAt: new Date(),
     };
 
-    // Create user document
     await userRef.set(newUser);
 
     // Create public link document
@@ -38,7 +87,25 @@ export class UserService {
       createdAt: new Date(),
     });
 
+    console.log(`✅ Created new user ${uid} with publicId: ${publicId}`);
     return newUser;
+  }
+
+  /**
+   * Create a new public link for a user
+   */
+  private static async createPublicLinkForUser(uid: string): Promise<string> {
+    const publicId = generatePublicId();
+
+    await db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId).set({
+      publicId,
+      ownerUid: uid,
+      isActive: true,
+      createdAt: new Date(),
+    });
+
+    console.log(`✅ Created public link for user ${uid}: ${publicId}`);
+    return publicId;
   }
 
   /**
@@ -52,9 +119,10 @@ export class UserService {
         return null;
       }
       
+      const userData = userDoc.data();
       return { 
-        uid: userDoc.id, 
-        ...userDoc.data() 
+        ...userData,
+        uid: userDoc.id
       } as User;
     } catch (error) {
       if (env.nodeEnv === 'development') {

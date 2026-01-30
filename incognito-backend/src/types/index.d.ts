@@ -26,5 +26,8 @@ export interface User {
   uid: string;
   email?: string;
   publicId?: string;
+  publicLink?: string; // ✅ ADD THIS
+  linkUpdatedAt?: Date; // ✅ ADD THIS (optional but good to have)
   createdAt: Date;
+  updatedAt?: Date; // ✅ ADD THIS (optional but good to have)
 }

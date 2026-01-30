@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-interface EnvConfig {
+export interface EnvConfig {
   port: number;
   nodeEnv: string;
   firebase: {
@@ -15,27 +15,21 @@ interface EnvConfig {
     windowMs: number;
     maxRequests: number;
   };
+  frontendUrl: string;
 }
 
-const getEnvVar = (key: string, defaultValue?: string): string => {
-  const value = process.env[key];
-  if (!value && !defaultValue) {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-  return value || defaultValue!;
-};
-
 export const env: EnvConfig = {
-  port: parseInt(getEnvVar('PORT', '5001'), 10),
-  nodeEnv: getEnvVar('NODE_ENV', 'development'),
+  port: parseInt(process.env.PORT || '5001', 10),
+  nodeEnv: process.env.NODE_ENV || 'development',
   firebase: {
-    projectId: getEnvVar('FIREBASE_PROJECT_ID'),
-    clientEmail: getEnvVar('FIREBASE_CLIENT_EMAIL'),
-    privateKey: getEnvVar('FIREBASE_PRIVATE_KEY').replace(/\\n/g, '\n'),
+    projectId: process.env.FIREBASE_PROJECT_ID || '',
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
   },
-  allowedOrigins: getEnvVar('ALLOWED_ORIGINS', 'http://localhost:3000').split(','),
+  allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
   rateLimit: {
-    windowMs: parseInt(getEnvVar('RATE_LIMIT_WINDOW_MS', '900000'), 10),
-    maxRequests: parseInt(getEnvVar('RATE_LIMIT_MAX_REQUESTS', '100'), 10),
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
   },
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 };

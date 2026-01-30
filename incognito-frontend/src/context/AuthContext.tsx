@@ -37,10 +37,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const convertFirebaseUser = async (firebaseUser: FirebaseUser, retries = 3): Promise<User> => {
     try {
       const userDocRef = doc(db, 'users', firebaseUser.uid);
+      
+      // ✅ FORCE FRESH READ - bypass cache
       const userDoc = await getDoc(userDocRef);
       
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        
+        console.log('📖 Reading user from Firestore:', {
+          uid: firebaseUser.uid,
+          publicId: userData.publicId,
+          timestamp: new Date().toISOString()
+        });
+        
         return {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
@@ -69,6 +78,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         ...newUser,
         createdAt: serverTimestamp(),
       });
+      
+      console.log('✅ Created new user in Firestore:', { uid: firebaseUser.uid, publicId });
 
       return { uid: firebaseUser.uid, ...newUser };
     } catch (error: any) {

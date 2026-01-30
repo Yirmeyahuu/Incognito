@@ -6,7 +6,8 @@ import { Logo } from '../components/common/Logo';
 import { Modal } from '../components/common/Modal';
 import { LogoutConfirmModal } from '../components/common/LogoutConfirmModal';
 import { ViewMessageModal } from '../components/common/ViewMessageModal';
-import { messageApi, linkApi } from '../services/api';
+import { PublicLink } from '../components/common/PublicLink'; // ← NEW IMPORT
+import { messageApi } from '../services/api';
 import type { Message } from '../types';
 import type { BackendMessage } from '../services/api';
 
@@ -14,40 +15,16 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [publicLink, setPublicLink] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showViewMessageModal, setShowViewMessageModal] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Character limit for message preview
   const MESSAGE_PREVIEW_LIMIT = 150;
-
-  // Fetch user's public link
-  useEffect(() => {
-    const fetchPublicLink = async (): Promise<void> => {
-      if (!user) return;
-
-      try {
-        const response = await linkApi.getMyLink();
-        
-        if (response.success && response.data) {
-          const link = `${window.location.origin}/u/${response.data.publicId}`;
-          setPublicLink(link);
-        } else {
-          setError('Failed to load your public link');
-        }
-      } catch (err) {
-        setError('Failed to load your public link');
-      }
-    };
-
-    fetchPublicLink();
-  }, [user]);
 
   // Fetch inbox messages
   useEffect(() => {
@@ -130,29 +107,6 @@ export const Dashboard: React.FC = () => {
     fetchMessages();
   }, [user]);
 
-  const handleCopyLink = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(publicLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      setError('Failed to copy link');
-    }
-  };
-
-  const handleRegenerateLink = async (): Promise<void> => {
-    try {
-      const response = await linkApi.regenerateLink();
-      if (response.success && response.data) {
-        setPublicLink(`${window.location.origin}/u/${response.data.publicId}`);
-      } else {
-        setError(response.error || 'Failed to regenerate link');
-      }
-    } catch (err) {
-      setError('Failed to regenerate link');
-    }
-  };
-
   const handleSignOutClick = (): void => {
     setShowLogoutModal(true);
   };
@@ -161,6 +115,12 @@ export const Dashboard: React.FC = () => {
     setIsLoggingOut(true);
     try {
       await signOut();
+      
+      // Clear cached link on logout
+      if (user) {
+        localStorage.removeItem(`incognito_public_link_${user.uid}`);
+      }
+      
       navigate('/');
     } catch (error) {
       setError('Failed to sign out');
@@ -180,10 +140,9 @@ export const Dashboard: React.FC = () => {
       return { text: content, isTruncated: false };
     }
     
-    // Find the last space before the limit to avoid cutting words
     let truncateAt = limit;
     const lastSpace = content.lastIndexOf(' ', limit);
-    if (lastSpace > limit * 0.8) { // Only use last space if it's not too far back
+    if (lastSpace > limit * 0.8) {
       truncateAt = lastSpace;
     }
     
@@ -260,34 +219,8 @@ export const Dashboard: React.FC = () => {
 
         {/* Stats & Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Public Link Card */}
-          <div className="bg-[#111111] border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-all">
-            <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Your Public Link</h3>
-            <div className="flex items-center gap-3 mb-4">
-              <code className="flex-1 text-sm bg-[#0a0a0a] px-4 py-3 rounded-xl border border-white/5 truncate font-mono text-purple-400">
-                {publicLink || 'Loading...'}
-              </code>
-            </div>
-            <div className="flex gap-3">
-              <Button
-                variant="primary"
-                size="md"
-                onClick={handleCopyLink}
-                className="flex-1"
-                disabled={!publicLink}
-              >
-                {copied ? '✓ Copied!' : 'Copy Link'}
-              </Button>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={handleRegenerateLink}
-                disabled={!publicLink}
-              >
-                Regenerate
-              </Button>
-            </div>
-          </div>
+          {/* ✅ NEW: Public Link Component */}
+          <PublicLink />
 
           {/* Stats Card */}
           <div className="bg-gradient-to-br from-purple-500/10 via-pink-500/5 to-transparent border border-purple-500/20 rounded-2xl p-6">
@@ -333,7 +266,6 @@ export const Dashboard: React.FC = () => {
                   onClick={() => handleMessageClick(message)}
                   className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 hover:border-purple-500/30 hover:bg-[#111111] transition-all group cursor-pointer"
                 >
-                  {/* Date Label */}
                   <div className="flex items-center gap-2 mb-4">
                     <svg className="w-4 h-4 text-gray-600 group-hover:text-purple-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -343,7 +275,6 @@ export const Dashboard: React.FC = () => {
                     </span>
                   </div>
                   
-                  {/* Message Content */}
                   <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-5 group-hover:bg-[#1c1c1c] group-hover:border-purple-500/20 transition-colors">
                     <p className="text-base text-gray-200 leading-relaxed whitespace-pre-wrap break-words">
                       {previewText}
@@ -355,7 +286,6 @@ export const Dashboard: React.FC = () => {
                     </p>
                   </div>
 
-                  {/* Click indicator */}
                   <div className="mt-3 flex items-center justify-end gap-2 text-xs text-gray-600 group-hover:text-purple-400 transition-colors">
                     <span>Click to view full message</span>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -377,26 +307,14 @@ export const Dashboard: React.FC = () => {
         isLoading={isLoggingOut}
       />
 
-      {/* Share Link Modal */}
+      {/* Share Link Modal - Now uses PublicLink component */}
       <Modal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         title="Share Your Inbox Link"
         description="Share this link to receive anonymous messages"
       >
-        <div className="space-y-4">
-          <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-5">
-            <code className="text-sm text-purple-400 break-all font-mono">{publicLink}</code>
-          </div>
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={handleCopyLink}
-            className="w-full"
-          >
-            {copied ? '✓ Copied to Clipboard!' : 'Copy Link'}
-          </Button>
-        </div>
+        <PublicLink className="!p-0 !border-0 !bg-transparent" />
       </Modal>
 
       {/* View Message Modal */}

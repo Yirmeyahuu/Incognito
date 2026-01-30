@@ -2,6 +2,8 @@ import { auth } from '../config/firebase';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
+console.log('🔗 API Base URL:', API_BASE_URL); // ← ADD THIS
+
 /**
  * API Response types matching backend
  */
@@ -37,11 +39,19 @@ export interface BackendMessage {
  * Get Firebase ID token for authentication
  */
 const getAuthToken = async (): Promise<string> => {
+  console.log('🔐 Getting auth token...'); // ← ADD THIS
   const user = auth.currentUser;
+  
   if (!user) {
+    console.error('❌ No user authenticated!'); // ← ADD THIS
     throw new Error('User not authenticated');
   }
-  return await user.getIdToken();
+  
+  console.log('✅ User found:', user.uid); // ← ADD THIS
+  const token = await user.getIdToken();
+  console.log('✅ Token obtained, length:', token.length); // ← ADD THIS
+  
+  return token;
 };
 
 /**
@@ -51,8 +61,11 @@ const apiRequest = async <T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  console.log(`📡 API Request: ${options.method || 'GET'} ${url}`); // ← ADD THIS
+  
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -60,7 +73,10 @@ const apiRequest = async <T>(
       },
     });
 
+    console.log(`📡 Response status: ${response.status}`); // ← ADD THIS
+    
     const data = await response.json();
+    console.log('📡 Response data:', data); // ← ADD THIS
 
     if (!response.ok) {
       throw new Error(data.message || data.error || 'Request failed');
@@ -71,7 +87,7 @@ const apiRequest = async <T>(
       data: data.data || data,
     };
   } catch (error: any) {
-    console.error(`API Error [${endpoint}]:`, error);
+    console.error(`❌ API Error [${endpoint}]:`, error); // ← ENHANCED
     return {
       success: false,
       error: error.message || 'An unexpected error occurred',
@@ -86,8 +102,12 @@ const authenticatedRequest = async <T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
+  console.log(`🔒 Authenticated request to: ${endpoint}`); // ← ADD THIS
+  
   try {
     const token = await getAuthToken();
+    
+    console.log('✅ Token obtained, making request...'); // ← ADD THIS
     
     return await apiRequest<T>(endpoint, {
       ...options,
@@ -97,6 +117,7 @@ const authenticatedRequest = async <T>(
       },
     });
   } catch (error: any) {
+    console.error('❌ Authentication error:', error); // ← ENHANCED
     return {
       success: false,
       error: error.message || 'Authentication failed',
@@ -124,6 +145,7 @@ export const linkApi = {
    * Get user's public link
    */
   getMyLink: async (): Promise<ApiResponse<BackendPublicLink>> => {
+    console.log('🔗 linkApi.getMyLink called'); // ← ADD THIS
     return authenticatedRequest<BackendPublicLink>('/links/my-link');
   },
 
@@ -131,6 +153,7 @@ export const linkApi = {
    * Regenerate user's public link
    */
   regenerateLink: async (): Promise<ApiResponse<BackendPublicLink>> => {
+    console.log('🔗 linkApi.regenerateLink called'); // ← ADD THIS
     return authenticatedRequest<BackendPublicLink>('/links/regenerate', {
       method: 'POST',
     });
