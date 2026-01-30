@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../config/firebase';
 import type { User, AuthContextType } from '../types';
 import { sanitizeInput, isValidEmail, RateLimiter } from '../utils/security';
@@ -33,7 +33,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return Array.from(array, byte => byte.toString(36)).join('').substring(0, 10);
   };
 
-  // Convert Firebase User to App User with retry logic
+  // ✅ NEW: Create publicLinks document in Firestore
+  const createPublicLinkDocument = async (uid: string, publicId: string): Promise<void> => {
+    try {
+      const linkRef = doc(db, 'publicLinks', publicId);
+      
+      await setDoc(linkRef, {
+        publicId,
+        ownerUid: uid,
+        isActive: true,
+        createdAt: serverTimestamp(),
+      });
+      
+      console.log(`✅ Created publicLinks document: ${publicId} for user: ${uid}`);
+    } catch (error) {
+      console.error('❌ Failed to create publicLinks document:', error);
+      throw error;
+    }
+  };
+
+  // Convert Firebase User to App User with publicLinks creation
   const convertFirebaseUser = async (firebaseUser: FirebaseUser, retries = 3): Promise<User> => {
     try {
       const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -49,6 +68,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           publicId: userData.publicId,
           timestamp: new Date().toISOString()
         });
+
+        // ✅ VERIFY: Check if publicLinks document exists
+        if (userData.publicId) {
+          const linkRef = doc(db, 'publicLinks', userData.publicId);
+          const linkDoc = await getDoc(linkRef);
+          
+          if (!linkDoc.exists()) {
+            console.warn(`⚠️ publicLinks document missing for ${userData.publicId}, creating...`);
+            await createPublicLinkDocument(firebaseUser.uid, userData.publicId);
+          }
+        } else {
+          // ✅ User exists but no publicId - create one
+          console.warn(`⚠️ User ${firebaseUser.uid} missing publicId, creating...`);
+          const newPublicId = generatePublicId();
+          
+          // Update user doc with publicId
+          await setDoc(userDocRef, { publicId: newPublicId }, { merge: true });
+          
+          // Create publicLinks doc
+          await createPublicLinkDocument(firebaseUser.uid, newPublicId);
+          
+          userData.publicId = newPublicId;
+        }
         
         return {
           uid: firebaseUser.uid,
@@ -60,7 +102,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
       }
 
-      // If user document doesn't exist, create it
+      // ✅ NEW USER: Create both user doc AND publicLinks doc atomically
+      console.log(`🆕 Creating first-time user ${firebaseUser.uid}...`);
+      
       const publicId = generatePublicId();
       const displayName = sanitizeInput(
         firebaseUser.displayName || firebaseUser.email?.split('@')[0] || ''
@@ -74,17 +118,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         createdAt: new Date(),
       };
 
-      await setDoc(userDocRef, {
+      // ✅ ATOMIC BATCH WRITE: Create both documents together
+      const batch = writeBatch(db);
+      
+      // Create user document
+      batch.set(userDocRef, {
         ...newUser,
         createdAt: serverTimestamp(),
       });
       
-      console.log('✅ Created new user in Firestore:', { uid: firebaseUser.uid, publicId });
+      // Create publicLinks document
+      const linkRef = doc(db, 'publicLinks', publicId);
+      batch.set(linkRef, {
+        publicId,
+        ownerUid: firebaseUser.uid,
+        isActive: true,
+        createdAt: serverTimestamp(),
+      });
+      
+      // Commit both writes atomically
+      await batch.commit();
+      
+      console.log(`✅ Successfully created first-time user with publicLinks: ${publicId}`);
 
       return { uid: firebaseUser.uid, ...newUser };
     } catch (error: any) {
       // Retry on network errors
       if (retries > 0 && (error.code === 'unavailable' || error.message.includes('offline'))) {
+        console.log(`🔄 Retrying user creation (${retries} attempts left)...`);
         await new Promise(resolve => setTimeout(resolve, 1000));
         return convertFirebaseUser(firebaseUser, retries - 1);
       }
@@ -103,6 +164,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(null);
         }
       } catch (error: any) {
+        console.error('❌ Auth state change error:', error);
+        
         // If it's an offline error, create a temporary user object
         if (error.message?.includes('offline') && firebaseUser) {
           const tempUser: User = {
@@ -207,6 +270,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       const result = await signInWithPopup(auth, googleProvider);
       
+      // Small delay to ensure Firestore writes complete
       await new Promise(resolve => setTimeout(resolve, 500));
       
       const appUser = await convertFirebaseUser(result.user);

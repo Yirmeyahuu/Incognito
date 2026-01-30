@@ -8,6 +8,7 @@ const USERS_COLLECTION = 'users';
 export class LinkService {
   /**
    * Get user's active public link
+   * ✅ ENHANCED: Better error handling and logging
    */
   static async getUserLink(uid: string): Promise<PublicLink | null> {
     console.log(`🔍 getUserLink called for uid: ${uid}`);
@@ -27,13 +28,29 @@ export class LinkService {
       return null;
     }
     
-    console.log(`✅ Found publicId in user doc: ${publicId}`);
+    // ✅ VERIFY: Check if public link document actually exists
+    const linkDoc = await db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId).get();
+    
+    if (!linkDoc.exists) {
+      console.error(`❌ Public link document missing for publicId: ${publicId}`);
+      console.error(`   This indicates a data inconsistency for user: ${uid}`);
+      return null;
+    }
+    
+    const linkData = linkDoc.data();
+    
+    if (!linkData?.isActive) {
+      console.log(`❌ Public link is inactive: ${publicId}`);
+      return null;
+    }
+    
+    console.log(`✅ Found valid public link: ${publicId}`);
     
     return {
       publicId,
       ownerUid: uid,
       isActive: true,
-      createdAt: userData.createdAt || new Date(),
+      createdAt: linkData.createdAt || userData.createdAt || new Date(),
     };
   }
 
@@ -52,7 +69,7 @@ export class LinkService {
       .where('ownerUid', '==', uid)
       .get();
 
-    console.log(`�️ Found ${oldLinkSnapshot.size} existing link(s) to DELETE`);
+    console.log(`🗑️ Found ${oldLinkSnapshot.size} existing link(s) to DELETE`);
     
     oldLinkSnapshot.docs.forEach(doc => {
       console.log(`   - Deleting: ${doc.id}`);
@@ -113,15 +130,26 @@ export class LinkService {
 
   /**
    * Validate if public link exists and is active
+   * ✅ ENHANCED: Better logging
    */
   static async validateLink(publicId: string): Promise<boolean> {
-    const linkDoc = await db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId).get();
-    
-    if (!linkDoc.exists) {
+    try {
+      const linkDoc = await db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId).get();
+      
+      if (!linkDoc.exists) {
+        console.log(`❌ Link validation failed: Document not found for ${publicId}`);
+        return false;
+      }
+
+      const linkData = linkDoc.data() as PublicLink;
+      const isValid = linkData.isActive === true;
+      
+      console.log(`${isValid ? '✅' : '❌'} Link validation for ${publicId}: ${isValid ? 'VALID' : 'INACTIVE'}`);
+      
+      return isValid;
+    } catch (error) {
+      console.error(`❌ Link validation error for ${publicId}:`, error);
       return false;
     }
-
-    const linkData = linkDoc.data() as PublicLink;
-    return linkData.isActive === true;
   }
 }

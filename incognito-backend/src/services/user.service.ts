@@ -8,7 +8,7 @@ const PUBLIC_LINKS_COLLECTION = 'publicLinks';
 export class UserService {
   /**
    * Get or create user with public link
-   * ✅ OPTIMIZED: Works with deleted old links
+   * ✅ FIXED: Handles both backend-first and frontend-first user creation
    */
   static async getOrCreateUser(uid: string, email?: string): Promise<User> {
     const userRef = db.collection(USERS_COLLECTION).doc(uid);
@@ -17,31 +17,28 @@ export class UserService {
     if (userDoc.exists) {
       const userData = userDoc.data() as User;
       
-      // ✅ Verify active link exists (old links are deleted, not deactivated)
-      const activeLinkSnapshot = await db
-        .collection(PUBLIC_LINKS_COLLECTION)
-        .where('ownerUid', '==', uid)
-        .where('isActive', '==', true)
-        .limit(1)
-        .get();
-      
-      if (!activeLinkSnapshot.empty) {
-        const activePublicId = activeLinkSnapshot.docs[0].data().publicId;
+      // ✅ Check if publicLinks document exists
+      if (userData.publicId) {
+        const linkDoc = await db.collection(PUBLIC_LINKS_COLLECTION).doc(userData.publicId).get();
         
-        // ✅ Update user doc if publicId doesn't match
-        if (userData.publicId !== activePublicId) {
-          console.warn(`⚠️ User ${uid} has mismatched publicId, syncing...`);
+        if (!linkDoc.exists) {
+          // ✅ Frontend created user doc but backend never created publicLinks doc
+          console.warn(`⚠️ User ${uid} has publicId but missing publicLinks doc, creating...`);
           
-          await userRef.update({ 
-            publicId: activePublicId,
-            updatedAt: new Date()
+          await db.collection(PUBLIC_LINKS_COLLECTION).doc(userData.publicId).set({
+            publicId: userData.publicId,
+            ownerUid: uid,
+            isActive: true,
+            createdAt: new Date(),
           });
           
-          userData.publicId = activePublicId;
+          console.log(`✅ Created missing publicLinks doc for user ${uid}: ${userData.publicId}`);
         }
+        
+        return { ...userData, uid } as User;
       } else {
-        // Create new link if none exists (old ones were deleted)
-        console.warn(`⚠️ No active link found for user ${uid}, creating new one...`);
+        // ✅ Old user without publicId - create one
+        console.warn(`⚠️ User ${uid} missing publicId, creating...`);
         const newPublicId = await this.createPublicLinkForUser(uid);
         
         await userRef.update({ 
@@ -50,13 +47,15 @@ export class UserService {
         });
         
         userData.publicId = newPublicId;
+        return { ...userData, uid } as User;
       }
-      
-      return { ...userData, uid } as User;
     }
 
-    // ✅ Create new user with publicId only
+    // ✅ FIRST-TIME USER (backend-first creation)
+    console.log(`🆕 Creating first-time user ${uid} with atomic batch write...`);
+    
     const publicId = generatePublicId();
+    const batch = db.batch();
     
     const newUser: User = {
       uid,
@@ -65,17 +64,27 @@ export class UserService {
       createdAt: new Date(),
     };
 
-    await userRef.set(newUser);
+    // Create user document
+    batch.set(userRef, newUser);
 
-    // Create public link document
-    await db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId).set({
+    // Create public link document atomically
+    const linkRef = db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId);
+    batch.set(linkRef, {
       publicId,
       ownerUid: uid,
       isActive: true,
       createdAt: new Date(),
     });
 
-    console.log(`✅ Created new user ${uid} with publicId: ${publicId}`);
+    // ✅ Commit both writes atomically
+    try {
+      await batch.commit();
+      console.log(`✅ Successfully created first-time user ${uid} with publicId: ${publicId}`);
+    } catch (error) {
+      console.error(`❌ Failed to create user ${uid}:`, error);
+      throw new Error('Failed to create user account');
+    }
+
     return newUser;
   }
 
@@ -85,20 +94,22 @@ export class UserService {
   private static async createPublicLinkForUser(uid: string): Promise<string> {
     const publicId = generatePublicId();
 
-    await db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId).set({
-      publicId,
-      ownerUid: uid,
-      isActive: true,
-      createdAt: new Date(),
-    });
+    try {
+      await db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId).set({
+        publicId,
+        ownerUid: uid,
+        isActive: true,
+        createdAt: new Date(),
+      });
 
-    console.log(`✅ Created public link for user ${uid}: ${publicId}`);
-    return publicId;
+      console.log(`✅ Created public link for user ${uid}: ${publicId}`);
+      return publicId;
+    } catch (error) {
+      console.error(`❌ Failed to create public link for user ${uid}:`, error);
+      throw new Error('Failed to create public link');
+    }
   }
 
-  /**
-   * Get user by UID
-   */
   static async getUserByUid(uid: string): Promise<User | null> {
     try {
       const userDoc = await db.collection(USERS_COLLECTION).doc(uid).get();
@@ -118,23 +129,19 @@ export class UserService {
     }
   }
 
-  /**
-   * Get user by public ID
-   * ✅ OPTIMIZED: Only checks if link exists (deleted links won't be found)
-   */
   static async getUserByPublicId(publicId: string): Promise<User | null> {
     try {
       const linkDoc = await db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId).get();
       
-      // ✅ If link doesn't exist (deleted), return null
       if (!linkDoc.exists) {
+        console.log(`❌ Public link not found: ${publicId}`);
         return null;
       }
 
       const linkData = linkDoc.data();
       
-      // ✅ Still check isActive for safety
       if (!linkData?.isActive) {
+        console.log(`❌ Public link is inactive: ${publicId}`);
         return null;
       }
 
@@ -144,6 +151,13 @@ export class UserService {
       }
 
       const user = await this.getUserByUid(linkData.ownerUid);
+      
+      if (!user) {
+        console.error(`❌ User not found for ownerUid: ${linkData.ownerUid}`);
+        return null;
+      }
+      
+      console.log(`✅ Found user for publicId ${publicId}: ${user.uid}`);
       return user;
     } catch (error) {
       console.error('Error fetching user by public ID:', error);

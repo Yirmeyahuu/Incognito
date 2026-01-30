@@ -18,6 +18,7 @@ export const PublicLink: React.FC<PublicLinkProps> = ({ className = '' }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // ✅ REAL-TIME: Listen to Firestore user document for instant updates
   useEffect(() => {
@@ -39,11 +40,26 @@ export const PublicLink: React.FC<PublicLinkProps> = ({ className = '' }) => {
           if (userData.publicId) {
             const fullLink = `${window.location.origin}/u/${userData.publicId}`;
             setPublicLink(fullLink);
+            setError(''); // Clear any previous errors
+            setRetryCount(0); // Reset retry count on success
             console.log('✅ Real-time update - Link constructed:', fullLink);
             console.log('   Public ID:', userData.publicId);
           } else {
             console.warn('⚠️ No publicId found in user document');
-            setError('No public ID found. Please try regenerating your link.');
+            
+            // ✅ NEW: Auto-retry for first-time users
+            if (retryCount < 3) {
+              console.log(`🔄 Retry attempt ${retryCount + 1}/3 for first-time user...`);
+              setRetryCount(prev => prev + 1);
+              
+              // Retry after 2 seconds
+              setTimeout(() => {
+                // Force re-fetch by triggering component update
+                setIsLoading(true);
+              }, 2000);
+            } else {
+              setError('Link not ready yet. Please try regenerating your link.');
+            }
           }
         } else {
           console.warn('⚠️ User document does not exist in Firestore');
@@ -63,7 +79,7 @@ export const PublicLink: React.FC<PublicLinkProps> = ({ className = '' }) => {
       console.log('🧹 Cleaning up Firestore listener');
       unsubscribe();
     };
-  }, [user]);
+  }, [user, retryCount]);
 
   const handleCopyLink = async (): Promise<void> => {
     try {
@@ -113,6 +129,14 @@ export const PublicLink: React.FC<PublicLinkProps> = ({ className = '' }) => {
           </div>
         )}
 
+        {/* ✅ NEW: Loading state indicator for first-time users */}
+        {isLoading && retryCount > 0 && (
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-4 text-xs text-blue-400 flex items-center gap-2">
+            <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+            <span>Setting up your link... (Attempt {retryCount}/3)</span>
+          </div>
+        )}
+
         <div className="flex items-center gap-3 mb-4">
           <code className="flex-1 text-sm bg-[#0a0a0a] px-4 py-3 rounded-xl border border-white/5 truncate font-mono text-purple-400">
             {isLoading ? 'Loading...' : publicLink || 'No link available'}
@@ -135,13 +159,13 @@ export const PublicLink: React.FC<PublicLinkProps> = ({ className = '' }) => {
               variant="outline"
               size="md"
               onClick={handleRegenerateLink}
-              disabled={!publicLink || isRegenerating || isLoading}
+              disabled={isRegenerating || isLoading}
             >
               {isRegenerating ? 'Regenerating...' : 'Regenerate'}
             </Button>
           </div>
 
-          {/* ✅ UPDATED: Share to Social Media Button - Smaller size */}
+          {/* Share to Social Media Button */}
           <button
             onClick={() => setShowShareModal(true)}
             disabled={!publicLink || isRegenerating || isLoading}
@@ -161,7 +185,7 @@ export const PublicLink: React.FC<PublicLinkProps> = ({ className = '' }) => {
         )}
       </div>
 
-      {/* ✅ Share Modal */}
+      {/* Share Modal */}
       {showShareModal && (
         <ShareCardGenerator
           publicLink={publicLink}
