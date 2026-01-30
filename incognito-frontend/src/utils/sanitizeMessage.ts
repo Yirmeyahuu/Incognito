@@ -11,9 +11,9 @@ export const sanitizeMessage = (message: string): string => {
   // Trim whitespace
   sanitized = sanitized.trim();
   
-  // Limit length
-  if (sanitized.length > 500) {
-    sanitized = sanitized.substring(0, 500);
+  // Limit length to 1000 characters
+  if (sanitized.length > 1000) {
+    sanitized = sanitized.substring(0, 1000);
   }
   
   return sanitized;
@@ -31,8 +31,8 @@ export const validateMessage = (message: string): { isValid: boolean; error?: st
     return { isValid: false, error: 'Message must be at least 3 characters long' };
   }
   
-  if (message.trim().length > 500) {
-    return { isValid: false, error: 'Message must be less than 500 characters' };
+  if (message.trim().length > 1000) {
+    return { isValid: false, error: 'Message must be less than 1000 characters' };
   }
   
   return { isValid: true };
