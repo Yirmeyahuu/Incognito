@@ -6,5 +6,9 @@ const PORT = env.port;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📝 Environment: ${env.nodeEnv}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  
+  if (env.nodeEnv === 'development') {
+    console.log(`🔗 API: http://localhost:${PORT}/api`);
+    console.log(`💚 Health: http://localhost:${PORT}/health`);
+  }
 });

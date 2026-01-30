@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { auth } from '../config/firebase';
 import { AuthRequest } from '../types';
+import { env } from '../config/env';
 
 /**
  * Middleware to verify Firebase ID token
@@ -35,7 +36,9 @@ export const authenticateUser = async (
 
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
+    if (env.nodeEnv === 'development') {
+      console.error('Authentication error:', error);
+    }
     res.status(401).json({
       error: 'Unauthorized',
       message: 'Invalid or expired token',

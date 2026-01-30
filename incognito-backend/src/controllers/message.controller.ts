@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../types';
 import { MessageService } from '../services/message.service';
 import { UserService } from '../services/user.service';
+import { env } from '../config/env';
 
 export class MessageController {
   /**
@@ -12,10 +13,7 @@ export class MessageController {
     try {
       const { publicId } = req.params;
       const { content } = req.body;
-  
-      console.log('📨 Sending message to publicId:', publicId); // DEBUG
-      console.log('📝 Message content:', content); // DEBUG
-  
+
       // Validate input
       if (!content || typeof content !== 'string') {
         res.status(400).json({
@@ -24,9 +22,9 @@ export class MessageController {
         });
         return;
       }
-  
+
       const trimmedContent = content.trim();
-  
+
       if (trimmedContent.length === 0) {
         res.status(400).json({
           error: 'Bad Request',
@@ -34,7 +32,7 @@ export class MessageController {
         });
         return;
       }
-  
+
       if (trimmedContent.length > 500) {
         res.status(400).json({
           error: 'Bad Request',
@@ -42,35 +40,29 @@ export class MessageController {
         });
         return;
       }
-  
+
       // Get receiver by public ID
-      console.log('🔍 Looking up receiver...'); // DEBUG
       const receiver = await UserService.getUserByPublicId(publicId);
-      console.log('👤 Receiver found:', receiver); // DEBUG
-  
+
       if (!receiver) {
-        console.log('❌ Receiver not found'); // DEBUG
         res.status(404).json({
           error: 'Not Found',
           message: 'Invalid or inactive link',
         });
         return;
       }
-  
+
       if (!receiver.uid) {
-        console.error('❌ Receiver missing uid:', receiver); // DEBUG
         res.status(500).json({
           error: 'Internal Server Error',
           message: 'Invalid user data',
         });
         return;
       }
-  
+
       // Create message
-      console.log('💾 Creating message for uid:', receiver.uid); // DEBUG
       const message = await MessageService.createMessage(receiver.uid, trimmedContent);
-      console.log('✅ Message created:', message.id); // DEBUG
-  
+
       res.status(201).json({
         success: true,
         message: 'Message sent successfully',
@@ -80,7 +72,9 @@ export class MessageController {
         },
       });
     } catch (error) {
-      console.error('❌ Send message error:', error);
+      if (env.nodeEnv === 'development') {
+        console.error('Send message error:', error);
+      }
       res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to send message',
@@ -108,7 +102,9 @@ export class MessageController {
         },
       });
     } catch (error) {
-      console.error('Get inbox error:', error);
+      if (env.nodeEnv === 'development') {
+        console.error('Get inbox error:', error);
+      }
       res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to retrieve messages',
@@ -140,7 +136,9 @@ export class MessageController {
         message: 'Message marked as read',
       });
     } catch (error) {
-      console.error('Mark as read error:', error);
+      if (env.nodeEnv === 'development') {
+        console.error('Mark as read error:', error);
+      }
       res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to mark message as read',
@@ -172,7 +170,9 @@ export class MessageController {
         message: 'Message deleted successfully',
       });
     } catch (error) {
-      console.error('Delete message error:', error);
+      if (env.nodeEnv === 'development') {
+        console.error('Delete message error:', error);
+      }
       res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to delete message',

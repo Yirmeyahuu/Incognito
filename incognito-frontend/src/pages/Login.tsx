@@ -43,22 +43,38 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#131313] text-white flex items-center justify-center px-3 sm:px-4 py-6">
+    <div className="h-screen bg-[#0a0a0a] text-white flex items-center justify-center px-4 relative overflow-hidden">
+      {/* Go Back Home Button - Top Left */}
+      <Link
+        to="/"
+        className="absolute top-4 left-4 sm:top-6 sm:left-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors group z-10"
+      >
+        <svg 
+          className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        <span className="text-sm font-medium hidden sm:inline">Back to Home</span>
+      </Link>
+
       <div className="w-full max-w-md">
-        {/* Logo/Brand - Compact */}
-        <div className="text-center mb-6 sm:mb-8">
+        {/* Logo/Brand */}
+        <div className="text-center mb-4 sm:mb-6">
           <Link to="/" className="inline-block">
             <Logo variant="dark" size="lg" className="justify-center" />
           </Link>
           <p className="text-gray-400 text-xs sm:text-sm mt-2">Welcome back! Sign in to your account</p>
         </div>
 
-        {/* Login Form - Compact */}
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl sm:rounded-2xl p-5 sm:p-7 shadow-xl">
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Login Form */}
+        <div className="bg-[#111111] border border-white/5 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
             {/* Error Message */}
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2.5 sm:p-3 text-xs sm:text-sm text-red-400">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2.5 text-xs sm:text-sm text-red-400">
                 {error}
               </div>
             )}
@@ -110,12 +126,12 @@ export const Login: React.FC = () => {
           </form>
 
           {/* Divider */}
-          <div className="relative my-5">
+          <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-white/10"></div>
             </div>
             <div className="relative flex justify-center text-xs sm:text-sm">
-              <span className="px-3 sm:px-4 bg-[#1a1a1a] text-gray-400">Or continue with</span>
+              <span className="px-3 sm:px-4 bg-[#111111] text-gray-400">Or continue with</span>
             </div>
           </div>
 
@@ -139,7 +155,7 @@ export const Login: React.FC = () => {
         </div>
 
         {/* Sign Up Link */}
-        <p className="text-center mt-5 sm:mt-6 text-xs sm:text-sm text-gray-400">
+        <p className="text-center mt-4 text-xs sm:text-sm text-gray-400">
           Don't have an account?{' '}
           <Link to="/signup" className="text-purple-400 hover:text-purple-300 font-medium transition-colors">
             Sign up for free

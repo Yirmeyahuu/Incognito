@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/common/Button';
 import { Logo } from '../components/common/Logo';
 import { messageApi, linkApi } from '../services/api';
-import { sanitizeMessage } from '../utils/security';
 
 export const SendMessage: React.FC = () => {
   const { publicId } = useParams<{ publicId: string }>();
@@ -17,7 +16,7 @@ export const SendMessage: React.FC = () => {
 
   // Validate the public link when component mounts
   useEffect(() => {
-    const validateLink = async () => {
+    const validateLink = async (): Promise<void> => {
       if (!publicId) {
         setError('Invalid link');
         setIsValidating(false);
@@ -33,7 +32,6 @@ export const SendMessage: React.FC = () => {
           setError('This link is no longer active or does not exist.');
         }
       } catch (err) {
-        console.error('Error validating link:', err);
         setError('Failed to validate link. Please try again.');
       } finally {
         setIsValidating(false);
@@ -43,63 +41,54 @@ export const SendMessage: React.FC = () => {
     validateLink();
   }, [publicId]);
 
-    // Update the handleSubmit function around line 60:
-
-    const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     
     if (!message.trim()) {
-        setError('Please enter a message');
-        return;
+      setError('Please enter a message');
+      return;
     }
 
     if (message.trim().length < 3) {
-        setError('Message must be at least 3 characters long');
-        return;
+      setError('Message must be at least 3 characters long');
+      return;
     }
 
     if (message.trim().length > 500) {
-        setError('Message must be less than 500 characters');
-        return;
+      setError('Message must be less than 500 characters');
+      return;
     }
 
     if (!publicId) {
-        setError('Invalid link');
-        return;
+      setError('Invalid link');
+      return;
     }
 
     setIsLoading(true);
     setError('');
 
     try {
-        console.log('Sending message to publicId:', publicId);
-        console.log('Message content:', message.trim());
-        
-        const response = await messageApi.sendMessage(publicId, message.trim());
-        
-        console.log('Send message response:', response);
-        
-        if (response.success) {
+      const response = await messageApi.sendMessage(publicId, message.trim());
+      
+      if (response.success) {
         setSuccess(true);
         setMessage('');
         
         // Reset success message after 5 seconds
         setTimeout(() => {
-            setSuccess(false);
+          setSuccess(false);
         }, 5000);
-        } else {
-        console.error('Send failed:', response.error);
+      } else {
         setError(response.error || 'Failed to send message. Please try again.');
-        }
+      }
     } catch (err) {
-        console.error('Error sending message:', err);
-        setError('Failed to send message. Please try again.');
+      setError('Failed to send message. Please try again.');
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
-    };
+  };
 
-  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
     const newMessage = e.target.value;
     if (newMessage.length <= 500) {
       setMessage(newMessage);
