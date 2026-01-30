@@ -35,7 +35,7 @@ export class MessageController {
         return;
       }
 
-      if (trimmedContent.length > 500) {
+      if (trimmedContent.length > 1000) {
         res.status(400).json({
           error: 'Bad Request',
           message: 'Message too long (max 500 characters)',
