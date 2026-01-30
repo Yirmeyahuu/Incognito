@@ -5,7 +5,7 @@ import { db } from '../config/firebase';
 
 export class LinkController {
   /**
-   * ✅ GET /api/links/my-link - Read from user document
+   * ✅ GET /api/links/my-link - Return only publicId
    */
   static async getMyLink(req: AuthRequest, res: Response): Promise<void> {
     console.log('🎯 getMyLink endpoint called');
@@ -13,7 +13,6 @@ export class LinkController {
       const uid = req.user!.uid;
       console.log(`   User UID: ${uid}`);
 
-      // ✅ Read directly from user document (fastest)
       const userDoc = await db.collection('users').doc(uid).get();
       
       if (!userDoc.exists) {
@@ -26,7 +25,6 @@ export class LinkController {
 
       const userData = userDoc.data();
       
-      // ✅ Add null check
       if (!userData || !userData.publicId) {
         res.status(500).json({
           error: 'Internal Server Error',
@@ -35,11 +33,11 @@ export class LinkController {
         return;
       }
 
+      // ✅ Return only publicId - let frontend construct full URL
       res.status(200).json({
         success: true,
         data: {
           publicId: userData.publicId,
-          publicLink: userData.publicLink, // ✅ Return full link
         },
       });
     } catch (error) {
@@ -52,7 +50,7 @@ export class LinkController {
   }
 
   /**
-   * ✅ POST /api/links/regenerate - Returns new link immediately
+   * ✅ POST /api/links/regenerate - Return only publicId
    */
   static async regenerateLink(req: AuthRequest, res: Response): Promise<void> {
     console.log('🎯 regenerateLink endpoint called');
@@ -61,31 +59,12 @@ export class LinkController {
       console.log(`   User UID: ${uid}`);
 
       const newLink = await LinkService.regenerateLink(uid);
-      
-      // ✅ Read fresh user document to get full link
-      const userDoc = await db.collection('users').doc(uid).get();
-      const userData = userDoc.data();
 
-      // ✅ Add null check
-      if (!userData || !userData.publicLink) {
-        // Fallback: construct link from publicId
-        const fullLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/u/${newLink.publicId}`;
-        res.status(200).json({
-          success: true,
-          data: {
-            publicId: newLink.publicId,
-            publicLink: fullLink,
-          },
-          message: 'Link regenerated successfully',
-        });
-        return;
-      }
-
+      // ✅ Return only publicId - let frontend construct full URL
       res.status(200).json({
         success: true,
         data: {
           publicId: newLink.publicId,
-          publicLink: userData.publicLink, // ✅ Return full link
         },
         message: 'Link regenerated successfully',
       });

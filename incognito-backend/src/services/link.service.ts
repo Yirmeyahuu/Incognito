@@ -1,14 +1,13 @@
 import { db } from '../config/firebase';
 import { PublicLink } from '../types';
 import { generatePublicId } from '../utils/generatePublicId';
-import { env } from '../config/env';
 
 const PUBLIC_LINKS_COLLECTION = 'publicLinks';
 const USERS_COLLECTION = 'users';
 
 export class LinkService {
   /**
-   * ✅ SIMPLIFIED: Read directly from user document (single query)
+   * Get user's active public link
    */
   static async getUserLink(uid: string): Promise<PublicLink | null> {
     console.log(`🔍 getUserLink called for uid: ${uid}`);
@@ -30,24 +29,23 @@ export class LinkService {
     
     console.log(`✅ Found publicId in user doc: ${publicId}`);
     
-    // ✅ Return link data (we trust user document)
     return {
       publicId,
       ownerUid: uid,
       isActive: true,
-      createdAt: userData.linkUpdatedAt || userData.createdAt || new Date(),
+      createdAt: userData.createdAt || new Date(),
     };
   }
 
   /**
-   * ✅ ATOMIC: Regenerate updates user doc + publicLinks collection in ONE batch
+   * Regenerate user's public link
    */
   static async regenerateLink(uid: string): Promise<PublicLink> {
     console.log(`\n🔄 Starting regenerateLink for uid: ${uid}`);
     
     const batch = db.batch();
     
-    // ✅ STEP 1: Deactivate ALL old links
+    // Deactivate ALL old links
     const oldLinkSnapshot = await db
       .collection(PUBLIC_LINKS_COLLECTION)
       .where('ownerUid', '==', uid)
@@ -60,11 +58,10 @@ export class LinkService {
       batch.update(doc.ref, { isActive: false });
     });
 
-    // ✅ STEP 2: Create new link
+    // Create new link
     const newPublicId = generatePublicId();
-    const fullLink = `${env.frontendUrl}/u/${newPublicId}`;
     
-    console.log(`📝 Generated new link: ${fullLink}`); // ✅ ADD THIS
+    console.log(`📝 Generated new publicId: ${newPublicId}`);
     
     const newLink: PublicLink = {
       publicId: newPublicId,
@@ -77,45 +74,36 @@ export class LinkService {
     batch.set(newLinkRef, newLink);
     console.log(`✨ Creating new publicLinks doc: ${newPublicId}`);
 
-    // ✅ STEP 3: Update user document (CRITICAL!)
+    // Update user document with new publicId ONLY
     const userRef = db.collection(USERS_COLLECTION).doc(uid);
     const userDoc = await userRef.get();
     
-    console.log(`📄 User doc exists: ${userDoc.exists}`); // ✅ ADD THIS
+    console.log(`📄 User doc exists: ${userDoc.exists}`);
     
     if (userDoc.exists) {
-      const updateData = { 
+      batch.update(userRef, { 
         publicId: newPublicId,
-        publicLink: fullLink, // ✅ Store full link
-        linkUpdatedAt: new Date(),
         updatedAt: new Date()
-      };
-      
-      console.log(`📝 Updating user document with:`, updateData); // ✅ ADD THIS
-      batch.update(userRef, updateData);
+      });
+      console.log(`📝 Updating user document with publicId: ${newPublicId}`);
     } else {
-      const newUserData = {
+      batch.set(userRef, {
         uid,
         publicId: newPublicId,
-        publicLink: fullLink,
-        linkUpdatedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date()
-      };
-      
-      console.log(`📝 Creating new user document with:`, newUserData); // ✅ ADD THIS
-      batch.set(userRef, newUserData);
+      });
+      console.log(`📝 Creating new user document with publicId: ${newPublicId}`);
     }
 
-    // ✅ STEP 4: Commit atomically
+    // Commit atomically
     console.log(`💾 Committing batch write...`);
     
     try {
       await batch.commit();
-      console.log(`✅ Batch committed successfully! New link: ${newPublicId}`);
-      console.log(`✅ User document should now have publicLink: ${fullLink}\n`);
+      console.log(`✅ Batch committed successfully! New publicId: ${newPublicId}\n`);
     } catch (error) {
-      console.error(`❌ Batch commit FAILED:`, error); // ✅ ADD THIS
+      console.error(`❌ Batch commit FAILED:`, error);
       throw error;
     }
     
