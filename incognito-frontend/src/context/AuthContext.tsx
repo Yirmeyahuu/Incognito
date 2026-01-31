@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return Array.from(array, byte => byte.toString(36)).join('').substring(0, 10);
   };
 
-  // ✅ NEW: Create publicLinks document in Firestore
+  // ✅ Create publicLinks document in Firestore
   const createPublicLinkDocument = async (uid: string, publicId: string): Promise<void> => {
     try {
       const linkRef = doc(db, 'publicLinks', publicId);
@@ -66,6 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('📖 Reading user from Firestore:', {
           uid: firebaseUser.uid,
           publicId: userData.publicId,
+          profilePhoto: userData.profilePhoto, // ✅ LOG PROFILE PHOTO
           timestamp: new Date().toISOString()
         });
 
@@ -99,6 +100,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           publicId: userData.publicId,
           inboxEnabled: userData.inboxEnabled ?? true,
           createdAt: userData.createdAt?.toDate() || new Date(),
+          profilePhoto: userData.profilePhoto || 'avatar-1', // ✅ READ PROFILE PHOTO
+          customUsername: userData.customUsername, // ✅ READ CUSTOM USERNAME
         };
       }
 
@@ -116,6 +119,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         publicId,
         inboxEnabled: true,
         createdAt: new Date(),
+        profilePhoto: 'avatar-1', // ✅ DEFAULT PHOTO
+        customUsername: undefined,
       };
 
       // ✅ ATOMIC BATCH WRITE: Create both documents together
@@ -177,6 +182,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             publicId: 'temp-offline-id',
             inboxEnabled: true,
             createdAt: new Date(),
+            profilePhoto: 'avatar-1',
           };
           setUser(tempUser);
         } else {

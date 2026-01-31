@@ -97,4 +97,41 @@ export class LinkController {
       });
     }
   }
+
+  /**
+   * ✅ NEW: PATCH /api/links/toggle-status
+   * Toggle link active/inactive status
+   */
+  static async toggleLinkStatus(req: AuthRequest, res: Response): Promise<void> {
+    console.log('🎯 toggleLinkStatus endpoint called');
+    try {
+      const uid = req.user!.uid;
+      const { isActive } = req.body;
+
+      // Validate input
+      if (typeof isActive !== 'boolean') {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'isActive must be a boolean value',
+        });
+        return;
+      }
+
+      console.log(`   User UID: ${uid}, Setting isActive: ${isActive}`);
+
+      const result = await LinkService.toggleLinkStatus(uid, isActive);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: `Link ${isActive ? 'enabled' : 'disabled'} successfully`,
+      });
+    } catch (error: any) {
+      console.error('Toggle link status error:', error);
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: error.message || 'Failed to toggle link status',
+      });
+    }
+  }
 }

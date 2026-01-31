@@ -197,6 +197,7 @@ export const Dashboard: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* ✅ Desktop: Show Share Link + Profile */}
               <Button
                 variant="outline"
                 size="sm"
@@ -205,9 +206,14 @@ export const Dashboard: React.FC = () => {
               >
                 Share Link
               </Button>
-              <Button variant="outline" size="sm" onClick={handleSignOutClick}>
-                Sign Out
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/profile')}
+              >
+                Profile
               </Button>
+              {/* ❌ REMOVED: Sign Out button */}
             </div>
           </div>
         </div>

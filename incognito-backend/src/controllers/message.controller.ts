@@ -10,6 +10,7 @@ export class MessageController {
   /**
    * POST /api/messages/send/:publicId
    * Send anonymous message (no auth required)
+   * ✅ UPDATED: Check if link is active before sending
    */
   static async sendMessage(req: AuthRequest, res: Response): Promise<void> {
     try {
@@ -38,15 +39,15 @@ export class MessageController {
       if (trimmedContent.length > 1000) {
         res.status(400).json({
           error: 'Bad Request',
-          message: 'Message too long (max 500 characters)',
+          message: 'Message too long (max 1000 characters)',
         });
         return;
       }
 
-      // Get receiver by public ID
-      const receiver = await UserService.getUserByPublicId(publicId);
-
-      if (!receiver) {
+      // ✅ CHECK 1: Verify public link exists
+      const linkDoc = await db.collection('publicLinks').doc(publicId).get();
+      
+      if (!linkDoc.exists) {
         res.status(404).json({
           error: 'Not Found',
           message: 'Invalid or inactive link',
@@ -54,10 +55,25 @@ export class MessageController {
         return;
       }
 
-      if (!receiver.uid) {
-        res.status(500).json({
-          error: 'Internal Server Error',
-          message: 'Invalid user data',
+      const linkData = linkDoc.data();
+      
+      // ✅ CHECK 2: Verify link is ACTIVE
+      if (!linkData || linkData.isActive !== true) {
+        res.status(403).json({
+          error: 'Forbidden',
+          message: 'This link has been disabled by the owner',
+          code: 'LINK_DISABLED', // ✅ Frontend will check this
+        });
+        return;
+      }
+
+      // ✅ CHECK 3: Get receiver and verify inbox is enabled
+      const receiver = await UserService.getUserByPublicId(publicId);
+
+      if (!receiver || !receiver.uid) {
+        res.status(404).json({
+          error: 'Not Found',
+          message: 'Invalid or inactive link',
         });
         return;
       }
@@ -84,6 +100,7 @@ export class MessageController {
     }
   }
 
+  // ...existing code...
   /**
    * GET /api/messages/inbox
    * Get authenticated user's inbox

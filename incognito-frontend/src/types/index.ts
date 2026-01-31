@@ -5,6 +5,8 @@ export interface User {
   publicId: string;
   inboxEnabled: boolean;
   createdAt: Date;
+  profilePhoto?: string;
+  customUsername?: string;
 }
 
 export interface Message {

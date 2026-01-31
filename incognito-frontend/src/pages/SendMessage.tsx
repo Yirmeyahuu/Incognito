@@ -14,6 +14,7 @@ export const SendMessage: React.FC = () => {
   const [isValidLink, setIsValidLink] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [error, setError] = useState('');
+  const [linkDisabled, setLinkDisabled] = useState(false);
 
   const MAX_CHARACTERS = 1000;
 
@@ -77,7 +78,12 @@ export const SendMessage: React.FC = () => {
         setMessage('');
         setShowSuccessModal(true);
       } else {
-        setError(response.error || 'Failed to send message. Please try again.');
+        // ✅ CHECK FOR LINK_DISABLED ERROR
+        if (response.code === 'LINK_DISABLED') {
+          setLinkDisabled(true);
+        } else {
+          setError(response.error || 'Failed to send message. Please try again.');
+        }
       }
     } catch (err) {
       setError('Failed to send message. Please try again.');
@@ -110,6 +116,39 @@ export const SendMessage: React.FC = () => {
         <div className="text-center">
           <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3 sm:mb-4"></div>
           <p className="text-gray-400 text-sm sm:text-base">Validating link...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ NEW: Link Disabled State
+  if (linkDisabled) {
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <header className="border-b border-white/10">
+          <div className="container mx-auto px-4 py-4 sm:py-6">
+            <Logo variant="dark" size="sm" />
+          </div>
+        </header>
+
+        <div className="container mx-auto px-4 py-8 sm:py-16 max-w-lg">
+          <div className="bg-[#0a0a0a] border border-orange-500/20 rounded-xl sm:rounded-2xl p-6 sm:p-8 text-center">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+              <svg className="w-8 h-8 sm:w-10 sm:h-10 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2 sm:mb-3 text-white">Link Disabled</h1>
+            <p className="text-gray-400 text-sm sm:text-base mb-6 sm:mb-8 leading-relaxed">
+              This anonymous messaging link has been temporarily disabled by the owner. They are not accepting messages at this time.
+            </p>
+            <button
+              onClick={() => navigate('/')}
+              className="px-6 py-2.5 sm:px-8 sm:py-3 bg-white text-black font-medium text-sm sm:text-base rounded-lg sm:rounded-xl hover:bg-gray-100 transition-colors"
+            >
+              Go to Home
+            </button>
+          </div>
         </div>
       </div>
     );

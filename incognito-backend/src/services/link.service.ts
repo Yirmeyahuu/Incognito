@@ -152,4 +152,61 @@ export class LinkService {
       return false;
     }
   }
+
+  /**
+   * ✅ NEW: Toggle link active/inactive status
+   * Updates both users and publicLinks collections atomically
+   */
+  static async toggleLinkStatus(uid: string, isActive: boolean): Promise<{ success: boolean; isActive: boolean }> {
+    console.log(`\n🔄 Toggling link status for uid: ${uid} to ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+    
+    try {
+      // Get user's publicId
+      const userDoc = await db.collection(USERS_COLLECTION).doc(uid).get();
+      
+      if (!userDoc.exists) {
+        console.error(`❌ User document not found for uid: ${uid}`);
+        throw new Error('User not found');
+      }
+
+      const userData = userDoc.data();
+      const publicId = userData?.publicId;
+      
+      if (!publicId) {
+        console.error(`❌ No publicId found for user: ${uid}`);
+        throw new Error('Public link not found');
+      }
+
+      // ✅ ATOMIC BATCH UPDATE: Update both collections together
+      const batch = db.batch();
+      
+      // Update users collection
+      const userRef = db.collection(USERS_COLLECTION).doc(uid);
+      batch.update(userRef, {
+        inboxEnabled: isActive,
+        updatedAt: new Date(),
+      });
+      console.log(`📝 Updating users/${uid} → inboxEnabled: ${isActive}`);
+      
+      // Update publicLinks collection
+      const linkRef = db.collection(PUBLIC_LINKS_COLLECTION).doc(publicId);
+      batch.update(linkRef, {
+        isActive,
+        updatedAt: new Date(),
+      });
+      console.log(`📝 Updating publicLinks/${publicId} → isActive: ${isActive}`);
+      
+      // Commit both updates atomically
+      await batch.commit();
+      console.log(`✅ Link status toggled successfully! isActive: ${isActive}\n`);
+      
+      return {
+        success: true,
+        isActive,
+      };
+    } catch (error) {
+      console.error(`❌ Failed to toggle link status:`, error);
+      throw error;
+    }
+  }
 }

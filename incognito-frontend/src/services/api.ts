@@ -7,6 +7,7 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
+  code?: string;
 }
 
 export interface BackendUser {
@@ -27,7 +28,7 @@ export interface BackendMessage {
   receiverUid: string;
   content: string;
   createdAt: string | { _seconds: number; _nanoseconds: number };
-  isRead: boolean; // ✅ Now comes from backend
+  isRead: boolean;
 }
 
 const getAuthToken = async (): Promise<string> => {
@@ -59,7 +60,10 @@ const apiRequest = async <T>(
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || data.error || 'Request failed');
+      // ✅ Preserve error code from backend
+      const error: any = new Error(data.message || data.error || 'Request failed');
+      error.code = data.code; // e.g., 'LINK_DISABLED'
+      throw error;
     }
 
     return {
@@ -71,6 +75,7 @@ const apiRequest = async <T>(
     return {
       success: false,
       error: error.message || 'An unexpected error occurred',
+      code: error.code, // ✅ Pass error code to caller
     };
   }
 };
@@ -117,6 +122,14 @@ export const linkApi = {
   validateLink: async (publicId: string): Promise<ApiResponse<{ isValid: boolean; ownerUid?: string }>> => {
     return apiRequest<{ isValid: boolean; ownerUid?: string }>(`/links/validate/${publicId}`);
   },
+
+  // ✅ NEW: Toggle link active/inactive status
+  toggleLinkStatus: async (isActive: boolean): Promise<ApiResponse<{ success: boolean; isActive: boolean }>> => {
+    return authenticatedRequest<{ success: boolean; isActive: boolean }>('/links/toggle-status', {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive }),
+    });
+  },
 };
 
 export const messageApi = {
@@ -137,7 +150,6 @@ export const messageApi = {
     });
   },
 
-  // ✅ NEW: Mark all messages as read
   markAllAsRead: async (): Promise<ApiResponse<{ count: number; message: string }>> => {
     return authenticatedRequest<{ count: number; message: string }>('/messages/mark-all-read', {
       method: 'PATCH',

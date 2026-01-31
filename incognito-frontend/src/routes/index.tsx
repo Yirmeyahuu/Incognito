@@ -5,7 +5,8 @@ import { Login } from '../pages/Login';
 import { Register } from '../pages/Register';
 import { Dashboard } from '../pages/Dashboard';
 import { Home } from '../pages/Home';
-import { SendMessage } from '../pages/SendMessage'; // ← ADD THIS IMPORT
+import { SendMessage } from '../pages/SendMessage';
+import { Profile } from '../pages/Profile'; 
 
 // Loading Component
 const LoadingScreen = () => (
@@ -94,6 +95,16 @@ export const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <Home />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ✨ NEW: Profile Route */}
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           }
         />
