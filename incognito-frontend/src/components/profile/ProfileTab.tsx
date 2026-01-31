@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
 import { Button } from '../common/Button';
 import { ProfilePhotoSelector } from '../common/ProfilePhotoSelector';
 import { UsernameEditor } from '../common/UsernameEditor';
+import { userApi } from '../../services/api'; // ✅ Use API instead of Firestore
 import type { User } from '../../types';
 
 interface ProfileTabProps {
@@ -14,45 +13,47 @@ interface ProfileTabProps {
 export const ProfileTab: React.FC<ProfileTabProps> = ({ user, onSignOut }) => {
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const [photoSuccess, setPhotoSuccess] = useState(false);
+  const [photoError, setPhotoError] = useState('');
   const [currentProfilePhoto, setCurrentProfilePhoto] = useState(user.profilePhoto || 'avatar-1');
 
+  // ✅ Use backend API instead of direct Firestore update
   const handlePhotoSelect = async (photoId: string) => {
     setIsSavingPhoto(true);
     setPhotoSuccess(false);
+    setPhotoError('');
 
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        profilePhoto: photoId,
-        updatedAt: new Date(),
-      });
+      const response = await userApi.updateProfilePhoto(photoId);
 
-      setCurrentProfilePhoto(photoId);
-      setPhotoSuccess(true);
-      setTimeout(() => setPhotoSuccess(false), 2000);
-
-      console.log('✅ Profile photo updated to:', photoId);
+      if (response.success && response.data) {
+        setCurrentProfilePhoto(response.data.profilePhoto);
+        setPhotoSuccess(true);
+        setTimeout(() => setPhotoSuccess(false), 2000);
+        console.log('✅ Profile photo updated to:', response.data.profilePhoto);
+      } else {
+        setPhotoError(response.error || 'Failed to update profile photo');
+      }
     } catch (error) {
       console.error('Failed to update profile photo:', error);
-      alert('Failed to update profile photo');
+      setPhotoError('Failed to update profile photo');
     } finally {
       setIsSavingPhoto(false);
     }
   };
 
+  // ✅ Use backend API instead of direct Firestore update
   const handleUsernameSave = async (username: string) => {
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        displayName: username,
-        customUsername: username,
-        updatedAt: new Date(),
-      });
+      const response = await userApi.updateUsername(username);
 
-      console.log('✅ Username updated to:', username);
-    } catch (error) {
+      if (response.success) {
+        console.log('✅ Username updated to:', response.data?.username);
+      } else {
+        throw new Error(response.error || 'Failed to save username');
+      }
+    } catch (error: any) {
       console.error('Failed to update username:', error);
-      throw new Error('Failed to save username');
+      throw new Error(error.message || 'Failed to save username');
     }
   };
 
@@ -71,6 +72,12 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ user, onSignOut }) => {
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
               <span className="text-[10px] sm:text-xs">Profile photo updated!</span>
+            </div>
+          )}
+
+          {photoError && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg sm:rounded-xl p-2 sm:p-3 mb-3 sm:mb-4 text-xs text-red-400">
+              {photoError}
             </div>
           )}
 
@@ -121,7 +128,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ user, onSignOut }) => {
           onClick={onSignOut}
           className="w-full sm:w-auto text-xs sm:text-sm flex items-center justify-center gap-2"
         >
-          <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 sm:w-5 sm:h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
           <span>Sign Out</span>

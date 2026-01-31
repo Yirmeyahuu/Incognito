@@ -60,10 +60,7 @@ const apiRequest = async <T>(
     const data = await response.json();
 
     if (!response.ok) {
-      // ✅ Preserve error code from backend
-      const error: any = new Error(data.message || data.error || 'Request failed');
-      error.code = data.code; // e.g., 'LINK_DISABLED'
-      throw error;
+      throw new Error(data.message || data.error || 'Request failed');
     }
 
     return {
@@ -75,7 +72,6 @@ const apiRequest = async <T>(
     return {
       success: false,
       error: error.message || 'An unexpected error occurred',
-      code: error.code, // ✅ Pass error code to caller
     };
   }
 };
@@ -106,6 +102,22 @@ export const userApi = {
   getProfile: async (): Promise<ApiResponse<BackendUser>> => {
     return authenticatedRequest<BackendUser>('/user/profile');
   },
+
+  // ✅ NEW: Update profile photo
+  updateProfilePhoto: async (photoId: string): Promise<ApiResponse<{ profilePhoto: string }>> => {
+    return authenticatedRequest<{ profilePhoto: string }>('/user/profile-photo', {
+      method: 'PATCH',
+      body: JSON.stringify({ profilePhoto: photoId }),
+    });
+  },
+
+  // ✅ NEW: Update username
+  updateUsername: async (username: string): Promise<ApiResponse<{ username: string }>> => {
+    return authenticatedRequest<{ username: string }>('/user/username', {
+      method: 'PATCH',
+      body: JSON.stringify({ username }),
+    });
+  },
 };
 
 export const linkApi = {
@@ -123,7 +135,6 @@ export const linkApi = {
     return apiRequest<{ isValid: boolean; ownerUid?: string }>(`/links/validate/${publicId}`);
   },
 
-  // ✅ NEW: Toggle link active/inactive status
   toggleLinkStatus: async (isActive: boolean): Promise<ApiResponse<{ success: boolean; isActive: boolean }>> => {
     return authenticatedRequest<{ success: boolean; isActive: boolean }>('/links/toggle-status', {
       method: 'PATCH',
