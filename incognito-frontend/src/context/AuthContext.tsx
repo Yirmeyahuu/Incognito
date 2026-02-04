@@ -113,24 +113,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         firebaseUser.displayName || firebaseUser.email?.split('@')[0] || ''
       );
       
-      const newUser: Omit<User, 'uid'> = {
+      // ✅ FIX: Create user data object WITHOUT undefined fields
+      const newUserData: Record<string, any> = {
         email: firebaseUser.email || '',
         displayName,
         publicId,
         inboxEnabled: true,
-        createdAt: new Date(),
+        createdAt: serverTimestamp(),
         profilePhoto: 'avatar-1',
-        customUsername: undefined,
       };
 
       // ✅ ATOMIC BATCH WRITE: Create both documents together
       const batch = writeBatch(db);
       
-      // Create user document
-      batch.set(userDocRef, {
-        ...newUser,
-        createdAt: serverTimestamp(),
-      });
+      // Create user document (WITHOUT undefined fields)
+      batch.set(userDocRef, newUserData);
       
       // Create publicLinks document
       const linkRef = doc(db, 'publicLinks', publicId);
@@ -146,7 +143,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log(`✅ Successfully created first-time user with publicLinks: ${publicId}`);
 
-      return { uid: firebaseUser.uid, ...newUser };
+      // ✅ Return User object (can include undefined fields for app use)
+      return {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        displayName,
+        publicId,
+        inboxEnabled: true,
+        createdAt: new Date(),
+        profilePhoto: 'avatar-1',
+        customUsername: undefined,
+      };
     } catch (error: any) {
       console.error('❌ Error in convertFirebaseUser:', error);
       
