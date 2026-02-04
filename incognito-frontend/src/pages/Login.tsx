@@ -19,9 +19,12 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
+      console.log('🔑 Attempting email/password login...');
       await signIn(email, password);
+      console.log('✅ Login successful, navigating to dashboard...');
       navigate('/dashboard');
     } catch (err: any) {
+      console.error('❌ Login failed:', err);
       setError(err.message || 'Invalid email or password. Please try again.');
     } finally {
       setIsLoading(false);
@@ -33,9 +36,16 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
+      console.log('🔵 Attempting Google sign in...');
       await signInWithGoogle();
-      navigate('/dashboard');
+      console.log('✅ Google sign in successful, navigating to dashboard...');
+      
+      // ✅ Ensure navigation happens after auth is complete
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 200);
     } catch (err: any) {
+      console.error('❌ Google sign in failed:', err);
       setError(err.message || 'Failed to sign in with Google.');
     } finally {
       setIsLoading(false);
@@ -150,7 +160,9 @@ export const Login: React.FC = () => {
               <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
               <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
-            <span className="text-xs sm:text-sm">Sign in with Google</span>
+            <span className="text-xs sm:text-sm">
+              {isLoading ? 'Signing in...' : 'Sign in with Google'}
+            </span>
           </Button>
         </div>
 

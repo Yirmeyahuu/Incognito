@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('📖 Reading user from Firestore:', {
           uid: firebaseUser.uid,
           publicId: userData.publicId,
-          profilePhoto: userData.profilePhoto, // ✅ LOG PROFILE PHOTO
+          profilePhoto: userData.profilePhoto,
           timestamp: new Date().toISOString()
         });
 
@@ -100,8 +100,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           publicId: userData.publicId,
           inboxEnabled: userData.inboxEnabled ?? true,
           createdAt: userData.createdAt?.toDate() || new Date(),
-          profilePhoto: userData.profilePhoto || 'avatar-1', // ✅ READ PROFILE PHOTO
-          customUsername: userData.customUsername, // ✅ READ CUSTOM USERNAME
+          profilePhoto: userData.profilePhoto || 'avatar-1',
+          customUsername: userData.customUsername,
         };
       }
 
@@ -119,7 +119,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         publicId,
         inboxEnabled: true,
         createdAt: new Date(),
-        profilePhoto: 'avatar-1', // ✅ DEFAULT PHOTO
+        profilePhoto: 'avatar-1',
         customUsername: undefined,
       };
 
@@ -148,13 +148,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       return { uid: firebaseUser.uid, ...newUser };
     } catch (error: any) {
+      console.error('❌ Error in convertFirebaseUser:', error);
+      
       // Retry on network errors
-      if (retries > 0 && (error.code === 'unavailable' || error.message.includes('offline'))) {
+      if (retries > 0 && (error.code === 'unavailable' || error.message?.includes('offline'))) {
         console.log(`🔄 Retrying user creation (${retries} attempts left)...`);
         await new Promise(resolve => setTimeout(resolve, 1000));
         return convertFirebaseUser(firebaseUser, retries - 1);
       }
-      throw error;
+      
+      throw error; // ✅ RE-THROW ERROR SO CALLER CAN HANDLE IT
     }
   };
 
@@ -163,31 +166,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
+          console.log('🔐 Auth state changed: User logged in:', firebaseUser.uid);
           const appUser = await convertFirebaseUser(firebaseUser);
+          console.log('✅ App user created/loaded:', appUser.uid);
           setUser(appUser);
         } else {
+          console.log('🔐 Auth state changed: User logged out');
           setUser(null);
         }
       } catch (error: any) {
         console.error('❌ Auth state change error:', error);
         
-        // If it's an offline error, create a temporary user object
-        if (error.message?.includes('offline') && firebaseUser) {
-          const tempUser: User = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            displayName: sanitizeInput(
-              firebaseUser.displayName || firebaseUser.email?.split('@')[0] || ''
-            ),
-            publicId: 'temp-offline-id',
-            inboxEnabled: true,
-            createdAt: new Date(),
-            profilePhoto: 'avatar-1',
-          };
-          setUser(tempUser);
-        } else {
-          setUser(null);
-        }
+        // ✅ DON'T CREATE TEMP USER - Let sign-in methods handle errors
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -210,12 +201,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       setLoading(true);
-      const userCredential = await createUserWithEmailAndPassword(auth, sanitizedEmail, password);
-      const appUser = await convertFirebaseUser(userCredential.user);
-      setUser(appUser);
+      console.log('📝 Starting email/password sign up...');
       
+      const userCredential = await createUserWithEmailAndPassword(auth, sanitizedEmail, password);
+      console.log('✅ Firebase user created:', userCredential.user.uid);
+      
+      // ✅ WAIT for Firestore documents to be created
+      const appUser = await convertFirebaseUser(userCredential.user);
+      console.log('✅ App user setup complete:', appUser.uid);
+      
+      setUser(appUser);
       signUpLimiter.reset(sanitizedEmail);
     } catch (error: any) {
+      console.error('❌ Sign up error:', error);
+      
       if (error.code === 'auth/email-already-in-use') {
         throw new Error('This email is already registered. Please sign in instead.');
       } else if (error.code === 'auth/weak-password') {
@@ -246,12 +245,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       setLoading(true);
-      const userCredential = await signInWithEmailAndPassword(auth, sanitizedEmail, password);
-      const appUser = await convertFirebaseUser(userCredential.user);
-      setUser(appUser);
+      console.log('🔑 Starting email/password sign in...');
       
+      const userCredential = await signInWithEmailAndPassword(auth, sanitizedEmail, password);
+      console.log('✅ Firebase sign in successful:', userCredential.user.uid);
+      
+      // ✅ WAIT for user data to load
+      const appUser = await convertFirebaseUser(userCredential.user);
+      console.log('✅ App user loaded:', appUser.uid);
+      
+      setUser(appUser);
       signInLimiter.reset(sanitizedEmail);
     } catch (error: any) {
+      console.error('❌ Sign in error:', error);
+      
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         throw new Error('Invalid email or password. Please try again.');
       } else if (error.code === 'auth/invalid-email') {
@@ -270,18 +277,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Sign in with Google
+  // ✅ FIXED: Sign in with Google
   const signInWithGoogle = async (): Promise<void> => {
     try {
       setLoading(true);
+      console.log('🔵 Starting Google sign in...');
+      
       const result = await signInWithPopup(auth, googleProvider);
+      console.log('✅ Google popup successful:', result.user.uid);
       
-      // Small delay to ensure Firestore writes complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      // ✅ CRITICAL: Wait for Firestore operations to complete
+      console.log('⏳ Setting up user profile in Firestore...');
       const appUser = await convertFirebaseUser(result.user);
+      console.log('✅ User profile ready:', appUser.uid);
+      
+      // ✅ VERIFY user was set before returning
       setUser(appUser);
+      
+      // ✅ Add small delay to ensure state updates propagate
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      console.log('✅ Google sign in complete, ready to navigate');
     } catch (error: any) {
+      console.error('❌ Google sign in error:', error);
+      
       if (error.code === 'auth/popup-closed-by-user') {
         throw new Error('Sign in cancelled.');
       } else if (error.code === 'auth/popup-blocked') {
@@ -292,7 +311,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('You are offline. Please check your internet connection.');
       }
       
-      throw new Error('Failed to sign in with Google. Please try again.');
+      throw new Error(error.message || 'Failed to sign in with Google. Please try again.');
     } finally {
       setLoading(false);
     }
